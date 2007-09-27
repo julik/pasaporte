@@ -1,0 +1,322 @@
+require 'helper'
+require 'fileutils'
+require 'testable_openid_fetcher'
+
+class TestOpenIDWorkflows < Pasaporte::WebTest
+  # We have to open up because it's the Fecther that's going
+  # to make requests
+  attr_reader :request, :response, :html_document
+  fixtures :pasaporte_profiles
+
+  def setup
+    super
+    @fetcher = TestableOpenidFetcher.new(self)
+    # You MIGHT have thought that using a MemoryStore would be faster. HA!
+    # Laughable, but it's actually much slower.
+    # MemoryStore - 29s, FilesystemStore - 18s
+    @store = OpenID::FilesystemStore.new('openid-consumer-store')
+    @openid_session = {}
+    init_consumer
+    @request['HTTP_HOST'] = @request['SERVER_NAME'] = 'test.host'
+    @trust_root = 'http://tativille.fr/wiki'
+    @return_to = 'http://tativille.fr/wiki/signup'
+    @hulot = Profile.find(1)
+  end
+
+  def send_request(*a)
+    returning(super(*a)) do
+      @html_document = HTML::Document.new(@response.body.to_s) unless @response.headers["Location"]
+    end
+  end
+    
+  def teardown
+    # Delete all the associations created during the test case
+    Camping::Models::Session.delete_all; Association.delete_all; Approval.delete_all; Throttle.delete_all
+    # Delete the store
+    FileUtils.rm_rf('openid-consumer-store')
+    # Call super for flexmock a.o.
+    super
+  end
+  
+  def test_default_discovery_page_sports_right_server_url
+    get '/monsieur-hulot'
+    assert_response :success
+    assert_select 'link[rel=openid.server]', true do | s |
+      s = s.pop
+      assert_equal "http://test.host/pasaporte/monsieur-hulot/openid", s.attributes["href"],
+        "Should contain the delegate address for Monsieur Hulot"
+    end
+    assert_select 'link[rel=openid.delegate]', true do | s |
+      s = s.pop
+      assert_equal "http://test.host/pasaporte/monsieur-hulot/openid", s.attributes["href"],
+        "Should contain the endpoint address for Monsieur Hulot"
+    end
+  end
+  
+  def test_in_which_tativille_begins_association
+    assert_equal 'test.host', @request['SERVER_NAME']
+    
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_kind_of OpenID::SuccessRequest, req
+    assert_equal "http://test.host/pasaporte/monsieur-hulot/openid", req.server_url
+    assert_equal "http://test.host/pasaporte/monsieur-hulot", req.identity_url
+    
+    # In this test we only get a next step URL
+    next_step_url = req.redirect_url(@trust_root, @return_to, immediate=false)
+    assert_nothing_raised("The URL received from the server should be parseable") do
+      next_step_url = URI.parse(next_step_url)
+    end
+    
+    assert_equal "http", next_step_url.scheme
+    assert_equal "test.host", next_step_url.host
+    
+    response_params = decode_qs(next_step_url.query)
+
+    assert_match(/#{Regexp.escape(@return_to + '?nonce=')}(.+)/, 
+      response_params["openid.return_to"],
+      "The return_to should be the one of the signup with a nonce")
+    assert_equal "http://test.host/pasaporte/monsieur-hulot/openid",
+      response_params["openid.identity"], "The identity is the server URL in this case"
+    assert_equal "checkid_setup", response_params['openid.mode'], 
+      "The current mode is checkid_setup"
+  end
+  
+  def test_in_which_monsieur_hulot_is_not_logged_in_and_asked_for_login_after_setup
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_kind_of OpenID::SuccessRequest, req
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    assert_response :redirect
+    assert_redirected_to '/monsieur-hulot/signon'
+    assert_not_nil @state.pending_openid, "A pending OpenID request should have been "+
+      "placed in the session"
+    assert_kind_of OpenID::Server::CheckIDRequest, @state.pending_openid
+  end
+  
+  def test_in_which_monsieur_hulot_is_asked_for_setup_decisions_after_logging_in
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    assert_response :redirect
+    assert_redirected_to '/monsieur-hulot/signon'
+    
+    post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+    assert_response :redirect
+    assert_redirected_to '/monsieur-hulot/openid',
+      "The redirection should be to the continuation of the OpenID procedure"
+    
+    assert_nothing_raised { follow_redirect }
+    assert_response :redirect
+    
+    assert_redirected_to '/monsieur-hulot/decide',
+      "Should send Monsieur Hulot to the page where he will confirm himself trusting the Tativille"
+    assert_not_nil @state.pending_openid,
+      "The state should contain the OpenID request to be processed"
+  end
+  
+  def test_in_which_monsieur_hulot_blindly_trusts_tativille
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+
+    follow_redirect # back to openid
+    assert_redirected_to '/monsieur-hulot/decide', "Should send Monsieur Hulot to the page " +
+      "where he will confirm himself trusting the Tativille"
+    follow_redirect # to decide
+    
+    assert_select 'h2' do | e |
+      assert_equal "<h2>Please approve <b>http://tativille.fr/wiki</b></h2>", e.to_s
+    end
+    
+    post '/monsieur-hulot/decide'
+    assert_redirected_to '/monsieur-hulot/openid',
+      "Monsieur Hulot should be redirected back to the openid workflow page after approving"
+    
+    @hulot.reload
+    approval = @hulot.approvals[0]
+    assert_kind_of Approval, approval, "An approval should have been made"
+    assert_equal @trust_root, approval.trust_root, "The approval approves tativille"
+  end
+  
+  def test_in_which_monsieur_hulot_decides_not_to_trust_tativille
+    post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+    
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    
+    assert_redirected_to '/monsieur-hulot/decide',
+      "Should send Monsieur Hulot to the page where he will confirm himself trusting the Tativille"
+    follow_redirect # to decide
+    
+    assert_select 'h2' do | e |
+      assert_equal "<h2>Please approve <b>http://tativille.fr/wiki</b></h2>", e.to_s
+    end
+    
+    post '/monsieur-hulot/decide', :nope => "Oh Non!"
+    path, qs = redirect_path_and_params
+    
+    assert_equal '/wiki/signup', path, 
+      "The taken decision should immediately send Monsieur Hulot back to the signup page"
+    assert_equal 0, Approval.count, "No Approvals should have been issued"
+    assert_kind_of OpenID::CancelResponse, @consumer.complete(qs), "The response is negative"
+  end
+  
+  def test_in_which_monsieur_hulot_already_approved_tativille_and_is_logged_in
+    prelogin!; preapprove!
+    
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    path, qs = redirect_path_and_params
+    assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
+    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs), "The response is positive"
+  end
+  
+  def test_in_which_monsieur_hulot_uses_immediate_mode_and_the_mode_totally_works
+    prelogin!; preapprove!
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised do 
+      get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
+    end
+    path, qs = redirect_path_and_params
+    
+    openid_resp = @consumer.complete qs
+    assert_kind_of OpenID::SuccessResponse, openid_resp
+  end
+
+  def test_in_which_monsieur_hulot_uses_immediate_mode_but_needs_to_login_first
+    preapprove!
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised do 
+      get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
+    end
+    path, qs = redirect_path_and_params
+    openid_resp = @consumer.complete qs
+    
+    assert_kind_of OpenID::SetupNeededResponse, openid_resp, "Setup is needed for this action"
+    assert_not_nil qs["openid.user_setup_url"], "The setup URL should be passed"
+    
+    setup_path, setup_qs = redirect_path_and_params(qs["openid.user_setup_url"])
+    assert_equal "/pasaporte/monsieur-hulot/signon", setup_path, "The setup path is the signon"
+    
+    post '/monsieur-hulot/signon', {:pass => 'monsieur-hulot'.reverse}.merge(setup_qs)
+    assert_response :redirect
+    assert_redirected_to "/monsieur-hulot/openid",
+      "Monsieur is now out of the immediate mode so we continue on to the openid process"
+    follow_redirect
+    path, qs = redirect_path_and_params
+    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs),
+      "Monsieur has now authorized Tativille, albeit not immediately"
+  end
+
+  def test_in_which_monsieur_hulot_uses_immediate_mode_but_needs_to_approve_first
+    prelogin!
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised do 
+      get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
+    end
+    path, qs = redirect_path_and_params
+    openid_resp = @consumer.complete qs
+    
+    assert_kind_of OpenID::SetupNeededResponse, openid_resp, "Setup is needed for this action"
+    assert_not_nil qs["openid.user_setup_url"], "The setup URL should be passed"
+    
+    setup_path, setup_qs = redirect_path_and_params(qs["openid.user_setup_url"])
+    assert_equal "/pasaporte/monsieur-hulot/decide", setup_path, "The setup path is /decide"
+    
+    get '/monsieur-hulot/decide', setup_qs
+    assert_response :success
+    post '/monsieur-hulot/decide'
+    assert_response :redirect
+    assert_redirected_to '/monsieur-hulot/openid'
+    follow_redirect
+    
+    path, qs = redirect_path_and_params
+    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs),
+      "Monsieur has now authorized Tativille, albeit not immediately"
+  end
+  
+  def test_in_which_monsieur_hulot_forgets_his_password_and_tativille_gets_a_refusal
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    assert_redirected_to '/monsieur-hulot/signon'
+    Pasaporte::MAX_FAILED_LOGIN_ATTEMPTS.times do
+      post '/monsieur-hulot/signon', :pass => 'cartouche'
+    end
+    assert_response :redirect
+    path, qs = redirect_path_and_params
+    assert_kind_of OpenID::CancelResponse, @consumer.complete(qs),
+      "Monsieur Hulot is denied authorization with Tativille after failing so miserably"
+  end
+
+  def test_in_which_monsieur_hulot_has_delegated
+    d = "http://leopenid.fr/endpoint"
+    
+    begin
+      @hulot.update_attributes :openid_delegate => d, :openid_server => d
+      err = assert_raise(TestableOpenidFetcher::ExternalResource, "Should go out looking for openid") do
+        @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+      end
+      assert_equal "OpenID consumer wants to have http://leopenid.fr/endpoint", err.message 
+    ensure
+      @hulot.update_attributes :openid_delegate => nil, :openid_server => nil
+    end
+  end
+  
+  def test_in_which_monsieur_hulot_is_throttled_and_gets_rejected_at_once
+    Throttle.set!(@request.to_hash)
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    assert_response :redirect
+    path, qs = redirect_path_and_params
+    assert_kind_of OpenID::CancelResponse, @consumer.complete(qs),
+      "Monsieur Hulot is instantly denied authorization with Tativille because he is throttled"
+    assert_nil @state.pending_openid, "No OpenID request should be left dangling at this point"
+  end
+  
+  def test_in_which_tativille_uses_dumb_mode
+    prelogin!; preapprove!
+    dumb = OpenID::DumbStore.new("les-vacances")
+    @consumer = OpenID::Consumer.new(@openid_session, dumb, @fetcher)
+    
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    path, qs = redirect_path_and_params
+    assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
+    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs), "The response is positive"
+  end
+  
+  private
+    # Prelogins Monsieur Hulot into Pasaporte
+    def prelogin!
+      post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+    end
+
+    # Preapproves tativille.fr as a site Monsieur Hulot trusts
+    def preapprove!
+      @hulot.approvals.create! :trust_root=>@trust_root
+    end
+    
+    def init_consumer
+      @consumer = OpenID::Consumer.new(@openid_session, @store, @fetcher)
+    end
+    def decode_qs(qs)
+      qs.to_s.split(/\&/).inject({}) do | params, segment |
+        k, v = segment.split(/\=/).map{|s| Camping.un(s)}
+        params[k] = v; params
+      end
+    end
+    def response_to_hash
+      Hash[*@response.body.split(/\n/).map{|p| p.split(/\:/)}.flatten].with_indifferent_access
+    end
+    def redirect_path_and_params(t = nil)
+      uri = (t ? URI.parse(t) : @response.headers["Location"])
+      [uri.path, decode_qs(uri.query)]
+    end
+    
+    def get_with_verbatim_url(url)
+      get(*recompose(url))
+    end
+    
+    def recompose(url)
+      u = URI.parse(url)
+      [u.path.gsub(/^\/pasaporte/, ''), decode_qs(u.query)]
+    end
+end

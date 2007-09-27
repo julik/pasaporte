@@ -1,0 +1,14 @@
+monsieur_hulot:
+  id: 1
+  nickname: "monsieur-hulot"
+  domain_name: "test.host"
+  dob: <%= Date.parse("12-01-1953").to_s(:db) %>
+  fullname: Monsieur Hulot
+  gender: 'm'
+  country: fr
+  shared: 1
+  postcode: 1234
+  info: " C'est alors que j'ai eu l'idée de présenter monsieur Hulot, 
+    personnage d'une indépendance complète, d'un désintéressement absolu
+    et dont l'étourderie, qui est son principal défaut, en fait, à notre
+    époque fonctionnelle, un inadapté."

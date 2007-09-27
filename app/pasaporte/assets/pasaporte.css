@@ -1,0 +1,118 @@
+/* Superresetthemall */
+* { margin: 0; padding: 0; }
+html { 
+  background: rgb(136, 138, 140) url("bgbar.png") top left repeat-x;
+  /* Force scrollbar */
+  height: 100%; margin-bottom: 1px;
+  /* I know trying myriad is stupid but I hope folks that have Adobe CS installed will appreciate */
+  font-family: "Myriad Pro", "Helvetica", "Lucida Grande", "Lucida Sans Unicode", "Helvetica", "Arial", sans-serif;
+}
+
+#work {
+  margin-top: 1em;
+  margin-left: auto;
+  margin-right: auto;
+  background: white url("mainbg_green.gif") top left repeat-x;
+  width: 19em;
+  padding: .2em 20px .5em 20px;
+  color: rgb(102,102,102);
+  /* kinda shadyw */
+  border: 3px solid rgb(50,50,50);
+  border-top: none;
+  border-left: none;
+}
+
+/* Show a red bar until the user is authed */
+#work.notAuth { background-image: url("mainbg_red.gif"); }
+
+h1, h2, h3 { line-height: 1.2em; font-weight: normal; margin-top: .5em; margin-bottom: .1em;}
+h1 { font-size: 2em; }
+h1 { font-size: 2em; }
+
+/* Only the important stuff is true black 
+  We also avoid the bolds of lucida */
+b, strong { color: rgb(20, 20, 20); font-weight: normal; }
+
+/* make the input bigger and swoosh the wacom around */
+input { font-size: inherit; }
+
+form#signon {
+  margin-top: .5em;
+}
+/* big center-aligned form */
+form#signon label {
+  font-size: 1.2em;
+  display: block;
+  position: relative;
+  margin-bottom: 4px;
+  margin-top: 4px;
+  clear: both;
+  text-align: left;
+}
+
+form#signon input.bigb {
+  margin-top: 10px;
+}
+
+form#signon label * {
+  width: 50%;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 43%;
+}
+
+div#msg {
+  margin: 1.1em 0 0.5em 0;
+  padding: 7px;
+  padding-top: 9px;
+  color: white;
+  background: rgb(250, 154, 132);
+}
+form { margin-bottom: .4em; }
+p { margin: .2em 0 .6em 0; }
+textarea { letter-spacing: .04em; margin-top: 1em; width: 100%;  border-width: 1px;}
+/* Here we have to be careful to keep Aqua widgets in Safari 3. The magic property is background. 
+http://particletree.com/notebook/design-friendly-select-elements-in-safari-3 */
+input, textarea, option { font-family: inherit; margin-top: 1px; font-size: inherit;}
+hr { visibility: hidden; margin-top: 7px; margin-bottom: 3px; }
+input[type=submit] { padding: .1em; }
+.fb {
+  padding-top: 3px; display: block; height: 1.3em; 
+  margin-bottom: .3em;  position: relative;
+}
+.sel {
+  padding-top: 3px; display: block; height: 3em; 
+  margin-bottom: .3em; position: relative;
+}
+.sel select {
+  width: 100%;
+  margin-top: 3px;
+  margin-bottom: 7px;
+}
+.fb input {
+  display: block; position: absolute; width: 60%;
+  height: inherit; font-size: inherit; right: 0; top: 0;
+}
+.rad {
+  padding-top: 3px; margin-bottom: 6px; display: block; 
+}
+.rad input {
+  font-size: x-small;
+}
+/* Checkbox labels need some indent */
+label.cblabel {
+  display: block;
+  padding-left: 1em;
+  text-indent: -1.3em;
+  padding-bottom: .5em;
+}
+.smaller {
+  font-size: .9em;
+  line-height: 1.1em;
+}
+a { color: #3258B8; }
+a:hover { color: #24459C; }
+a:active { color: blue ; }
+/* Some think that if a label is clickable the link inside should be shadowed (lookin' at you safari 3). */
+label a { z-index: 300; cursor: pointer;}
