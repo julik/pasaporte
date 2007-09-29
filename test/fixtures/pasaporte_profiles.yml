@@ -12,3 +12,27 @@ monsieur_hulot:
     personnage d'une indépendance complète, d'un désintéressement absolu
     et dont l'étourderie, qui est son principal défaut, en fait, à notre
     époque fonctionnelle, un inadapté."
+    
+julik:
+  id: 2
+  nickname: "julik"
+  domain_name: "id.company.net"
+  dob: <%= Date.parse("15-10-1983").to_s(:db) %>
+  fullname: Julik Tarkhanov
+  gender: 'm'
+  country: nl
+  shared: 0
+  postcode: 1234
+  info: "Wrote Pasaporte"
+
+max:
+  id: 3
+  nickname: "max"
+  domain_name: "id.company.net"
+  dob: <%= Date.parse("15-10-1983").to_s(:db) %>
+  fullname: Max Lapshin
+  gender: 'm'
+  country: ru
+  shared: 1
+  postcode: 3524
+  info: "Promised to help with Pasaporte but didn't"

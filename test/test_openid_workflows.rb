@@ -5,7 +5,7 @@ require File.dirname(__FILE__) + '/testable_openid_fetcher'
 class TestOpenIDWorkflows < Pasaporte::WebTest
   # We have to open up because it's the Fecther that's going
   # to make requests
-  attr_reader :request, :response, :html_document
+  attr_reader :request, :response
   fixtures :pasaporte_profiles
 
   def setup
@@ -22,13 +22,7 @@ class TestOpenIDWorkflows < Pasaporte::WebTest
     @return_to = 'http://tativille.fr/wiki/signup'
     @hulot = Profile.find(1)
   end
-
-  def send_request(*a)
-    returning(super(*a)) do
-      @html_document = HTML::Document.new(@response.body.to_s) unless @response.headers["Location"]
-    end
-  end
-    
+  
   def teardown
     # Delete all the associations created during the test case
     Camping::Models::Session.delete_all; Association.delete_all; Approval.delete_all; Throttle.delete_all

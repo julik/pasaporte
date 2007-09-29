@@ -36,9 +36,10 @@ include Pasaporte::Models
 
 class Pasaporte::WebTest < Camping::WebTest
   def setup; super; @class_name_abbr = 'Pasaporte'; end
+  attr_reader :html_document
+  def send_request(*a)
+    returning(super(*a)) do
+      @html_document = HTML::Document.new(@response.body.to_s) unless @response.headers["Location"]
+    end
+  end
 end
-
-class Test::Unit::TestCase
-  def self.remind(what); define_method(what) { flunk("Please write #{what}") }; end
-end
-

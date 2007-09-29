@@ -37,9 +37,8 @@ be self-signed or don't have an extra IP at hand.
 
 ==Profiles
 
-Pasaporte allows the user to have a simple passport page, which lists hist interests and
-maybe even sports his picture (do NOT think of goatse). The page is provided only if the
-user tells that he wants to.
+Pasaporte allows the user to have a simple passport page, where some info can be placed
+for people who follow the OpenID profile URL. Sharing the information si entirelly optional.
 
 ==The all-id
 

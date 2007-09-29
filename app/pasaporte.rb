@@ -3,7 +3,7 @@ $: << File.dirname(__FILE__) + '/pasaporte'
 
 Camping.goes :Pasaporte
 
-# Suppress the annoying require_gem warning in OpenID libs
+# Suppress the annoying require_gem warning in ruby-yadis
 silence_warnings { require 'openid' }
 require 'faster_openid'
 
@@ -24,7 +24,7 @@ module Pasaporte
   # Stick your super auth HERE. Should be a proc accepting login, pass and domain
   my_little_auth = lambda do | login, pass, domain |
     allowd = {"julian" => "useless"}
-    return (allowd[login] == pass)
+    return (allowd[login] && (allowd[login] == pass))
   end
   
   AUTH = my_little_auth
@@ -76,14 +76,14 @@ module Pasaporte
       end
       
       # Allow the user to log in. Suspend any variables passed in the session.
-      def require_login!(persistables = {})
+      def require_login(persistables = {})
         deny_throttled!
-        if (@state.nickname != @nickname || !is_logged_in?)
-           _redir_to_login_page!(persistables)
-        end
+        raise "No nickname" unless @nickname
+        _redir_to_login_page!(persistables) unless is_logged_in?
+        @profile = profile_by_nickname(@nickname)
         @title = "%s's pasaporte" % @nickname
       end
-  
+      
       # Deny throttled users any action
       def deny_throttled!
         raise Throttled if Models::Throttle.throttled?(env)
@@ -92,7 +92,6 @@ module Pasaporte
       def profile_by_nickname(n)
         ::Pasaporte::Models::Profile.find_or_create_by_nickname_and_domain_name(n, my_domain)
       end
-      
     end
     
     def expire_old_sessions!
@@ -269,7 +268,7 @@ module Pasaporte
       end
       
       def generate_sess_key
-        raise "Cannot generate a sesskey for a new profile" if new_record?
+        self.secret_salt ||= rand(Time.now)
         s = [nickname, secret_salt, Time.now.year, Time.now.month].join('|')
         OpenSSL::Digest::SHA1.new(s).hexdigest.to_s
       end
@@ -344,10 +343,29 @@ module Pasaporte
   require File.dirname(__FILE__) + '/pasaporte/pasaporte_store'
   
   module Controllers
+    
+    # Wraps the "get" and "post" with nickname passed in the path. When
+    # get_with_nick is called, @nickname is already there.
+    module Nicknames
+      def get(*extras)
+        raise "Nickname is required for this action" unless (@nickname = extras.shift)
+        get_with_nick(*extras)
+      end
+      
+      def post(*extras)
+        raise "Nickname is required for this action" unless (@nickname = extras.shift)
+        post_with_nick(*extras)
+      end
+      def respond_to?(m, *whatever)
+        super(m.to_sym) || super("#{m}_with_nick".to_sym)
+      end
+    end
+    
     # Make a controller for a specfic user
     def self.personal(uri = nil)
       returning(R(["/([^\/]+)", uri].compact.map{|e| e.to_s}.join("/"))) do | ak |
         ak.send(:include, Secure::CheckMethods)
+        ak.send(:include, Nicknames)
       end
     end
   
@@ -361,8 +379,7 @@ module Pasaporte
       class Denied < Err; end  #:nodoc
       class NoOpenidRequest < RuntimeError; end  #:nodoc
       
-      def get(nick)
-        @nickname = nick
+      def get_with_nick
         # Force a session save
         @state.touched = Time.now.to_i
         begin
@@ -409,8 +426,7 @@ module Pasaporte
         end
       end
   
-      def post(n)
-        @nickname = n
+      def post_with_nick
         req = openid_server.decode_request(input)
         # Check for dumb mode HIER!
         resp = openid_server.handle_request(req)
@@ -447,7 +463,7 @@ module Pasaporte
   
       def check_logged_in
         message = "Before authorizing '%s' you will need to login" % input["openid.trust_root"]
-        require_login!(:pending_openid => @oid_request, :msg => message)
+        require_login(:pending_openid => @oid_request, :msg => message)
       end
       
       def ask_user_to_approve
@@ -477,28 +493,57 @@ module Pasaporte
     
     # Return the yadis autodiscovery XML for the user
     class Yadis < personal(:yadis)
-      def get(nick)
-        @nickname = nick
+      def get_with_nick
         @headers["Content-type"] = "application/xrds+xml"
         @skip_layout = true
         render :yadis
       end
     end
     
+    class ApprovalsPage < personal(:approvals)
+      def get_with_nick
+        require_login
+        @approvals = @profile.approvals
+        render :approvals_page
+      end
+    end
+
+    class DeleteApproval < personal("disapprove/(\d+)")
+      def get_with_nick(id)
+        @nickname = nick
+        require_login
+        @profile.approvals.destroy(id)
+        redirect R(ApprovalsPage, @nickname)
+      end
+      alias_method :post_with_nick, :get_with_nick
+    end
+    
+    # Shows a signon page that allows to enter the login
+    class PublicSignon < R('/')
+      def get
+        render :signon_form
+      end
+      
+      def post
+        # encode the input and forward it to the private login page
+        y = Pasaporte.post(:Signon, input.login, {"env"=>env, "input" => input})
+        r(y.status, y.body, y.headers)
+      end
+    end
+    
     # Show the login form and accept the input
     class Signon < personal(:signon)
       
-      def get(nick )
+      def get_with_nick
         deny_throttled!
         if @state.pending_openid
           humane = URI.parse(@state.pending_openid.trust_root).host
           @msg = "Before authorizing with <b>#{humane}</b> you will need to login"
         end
-        @nickname = nick
         render :signon_form
       end
-  
-      def post(nick)
+      
+      def post_with_nick
         begin
           deny_throttled!
         rescue Pasaporte::Secure::Throttled => th
@@ -510,8 +555,6 @@ module Pasaporte
         end
         
         # The throttling logic must be moved into throttles apparently
-        @nickname = nick
-        
         # Start counting
         @state.failed_logins ||= 0
         
@@ -522,8 +565,8 @@ module Pasaporte
           # we need to take care of that and tell the OID consumer that we want to restart
           # from a different profile URL
           @state.nickname = @nickname
+          
           @profile = profile_by_nickname(@nickname)
-          @state.sess_key = @profile.generate_sess_key
           
           # Recet the grace counter
           @state.failed_logins = 0
@@ -539,7 +582,7 @@ module Pasaporte
             LOGGER.info("%s - failed %s times, taking action" %  
               [@nickname, MAX_FAILED_LOGIN_ATTEMPTS])
             punish_the_violator
-          else 
+          else
             @state.delete(:nickname)
             render :signon_form
           end
@@ -577,32 +620,28 @@ module Pasaporte
         end
       end
     end
-  
+    
     # Logout the user, remove associations and session
     class Signout < personal(:signout)
-      def get(nick)
-        return '' unless (@state.nickname == nick)
+      def get_with_nick
+        return '' unless (@state.nickname == @nickname)
         # reset the session
         @state = {:msg => "Thanks for using the service and goodbye"}
-        redirect R(Signon, nick)
+        redirect R(Signon, @nickname)
       end
     end
-  
+    
     # Figure out if we want to pass info to a site or not. This gets called
     # when associating for the first time
     class Decide < personal(:decide)
-      def get(nick)
-        @nickname = nick
-        require_login!
+      def get_with_nick
+        require_login
         @oid_request = @state.pending_openid
         render :decide
       end
-  
-      def post(nick)
-        @nickname = nick
-        require_login!
-        @profile = profile_by_nickname(nick)
-        
+      
+      def post_with_nick
+        require_login
         if !@state.pending_openid
           @report = "There is no more OpenID request to approve. Looks like it went out already."
           render :bailout
@@ -615,22 +654,18 @@ module Pasaporte
         end
       end
     end
-  
+    
     # Allows the user to modify the settings
     class ProfileEditor < personal(:edit)
-      def get(nick)
-        @nickname = nick
-        require_login!
-        
-        @profile = profile_by_nickname(nick)
+      def get_with_nick
+        require_login
         render :profile_form
       end
-  
-      def post(nick)
-        @nickname = nick
-        require_login!
+      
+      def post_with_nick
+        require_login
         _collapse_checkbox_input(input)
-        @profile = Profile.find_or_create_by_nickname_and_domain_name(nick, my_domain)
+        
         if @profile.update_attributes(input.profile)
           @msg = "Your settings have been changed"
         else
@@ -703,9 +738,7 @@ module Pasaporte
   module Helpers
   
     def is_logged_in?
-      return false unless (@state.nickname && @state.sess_key)
-      cp = profile_by_nickname(@state.nickname)
-      @state.sess_key == (cp && cp.generate_sess_key)
+      (@state.nickname && (@state.nickname == @nickname))
     end
     
     # Return a RELATIVELY reliable domain key
@@ -792,7 +825,7 @@ module Pasaporte
 
     def signon_form
       
-      form.signon! :method => :post, :action => R(Signon, @nickname) do
+      form.signon! :method => :post do
         label :for => 'login' do
           self << "Your name:"
           @nickname ? b(@nickname) : input.login!(:name => "login", :value => @nickname)
@@ -851,6 +884,11 @@ module Pasaporte
       uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
       OpenID::Util.normalize_url(uri)
     end
+    
+    def _our_identity_url
+      uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(ProfilePage, @nickname)].join('/').squeeze('/')
+      OpenID::Util.normalize_url(uri)
+    end
 
     # HTML esc. snatched off ERB
     def _h(s)
@@ -886,6 +924,23 @@ module Pasaporte
       # log me out button
     end
 
+    def approvals_page
+      h2 { "Hello " + b(@profile) }
+      p do
+        self << "You are now logged in. Pass the following address to any OpenID-enabled site that you want to visit"
+        b _our_identity_url
+      end
+      if @approvals.any?
+        h2 "The sites you trust"
+        p { small "These sites will be able to automatically log you in without first asking you to approve"}
+        ul do
+          @approvals.map do | app |
+            li { self << app; a "Remove", :href => R(DeleteApproval, app.id) }
+          end
+        end
+      end
+    end
+    
     def _tf(obj_name, field, t, opts = {})
       obj, field_name, id = instance_variable_get("@#{obj_name}"), "#{obj_name}[#{field}]", "#{obj_name}_#{field}"
       label.fb(:for => id) do
