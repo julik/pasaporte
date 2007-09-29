@@ -100,15 +100,29 @@ class TestSignon < Pasaporte::WebTest
     assert_equal 1, Throttle.count, "A throttle should have been made"
   end
   
-  def test_post_with_good_auth_shold_redirect_create_profile_and_munge_session
+  def test_post_with_good_auth_shold_fetch_profile_munge_session_and_redirect
     flexmock(Pasaporte::AUTH).
         should_receive(:call).with("julik", "junkman", "id.company.net").once.and_return(true)
     
     post '/julik/signon', :pass => 'junkman'
     
     assert_response :redirect
+    assert_redirected_to '/julik/edit'
+    
     assert_not_nil @assigns.profile, "The profile should have been hooked up"
     assert_equal 2, @assigns.profile.id, "This is Julik's profile"
     assert_equal 'julik', @state.nickname, "The nickname should be set to 'julik' so that the flag is present"
+  end
+  
+  def test_post_with_good_auth_should_create_profiles_if_necessary
+    flexmock(Pasaporte::AUTH).
+        should_receive(:call).with("gemanges", "tairn", "id.company.net").once.and_return(true)
+    
+    post '/gemanges/signon', :pass => 'tairn'
+    assert_response :redirect
+    
+    assert_not_nil @assigns.profile, "The profile should have been hooked up"
+    assert_equal 'gemanges', @assigns.profile.nickname
+    deny @assigns.profile.new_record?
   end
 end
