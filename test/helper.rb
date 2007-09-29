@@ -1,12 +1,18 @@
-require 'mosquito'
+require File.dirname(__FILE__) + '/mosquito'
+require File.dirname(__FILE__) + '/../app/pasaporte'
+
 require 'flexmock'
 require 'flexmock/test_unit'
-require File.dirname(__FILE__) + '/../app/pasaporte'
 
 # for assert_select and friends
 require 'action_pack'
 require 'action_controller/assertions'
 
+class Pasaporte::Controllers::ServerError
+  def get(*all)
+    raise all.pop
+  end
+end
 
 Test::Unit::TestCase.fixture_path = File.dirname(__FILE__) + "/fixtures/"
 ActiveRecord::Base.logger = Logger.new("/dev/null") # SAILENS!

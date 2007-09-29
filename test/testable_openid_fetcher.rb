@@ -17,6 +17,7 @@ class TestableOpenidFetcher
     @browser_getter = test_case
     @server_poster = OpenidPoster.new("test_foo")
     @server_poster.setup # manually yes
+    NetHTTPFetcher.requestor = @server_poster
   end
   
   def get(uri)
@@ -40,4 +41,28 @@ class TestableOpenidFetcher
       end
       u.path.gsub(/^\/pasaporte/, '')
     end
+end
+
+# And this bitch is for Ruby Yadis (which slows the testing down on my G5 about 30 times, thanks folks)
+class NetHTTPFetcher
+  def self.requestor=(x)
+    @requestor = x
+  end
+  
+  def self.requestor
+    @requestor
+  end
+  
+  def initialize(no_op=20, no_op_two=20); end
+    
+  def get(url, params = nil)
+    test_case = self.class.requestor
+    test_case.request.headers.merge!(params)
+    test_case.get(url)
+    
+    resp = test_case.response
+    mokie = Camping::H.new
+    mokie.body = test_case.response.body.to_s
+    [url, mokie]
+  end
 end

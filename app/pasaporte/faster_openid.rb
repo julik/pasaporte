@@ -22,6 +22,12 @@ begin
       base, power, mod = _bignos(base, power, mod)
       base.mod_exp(power, mod).to_i
     end
+    def self.get_random_bytes(n)
+      HAS_URANDOM ? File.open("/dev/urandom", "r"){|f| f.read(n) } :  random_string(n)
+    end
+    def self.rand(max)
+      Kernel::rand(max)
+    end
   end
 rescue LoadError
   Pasaporte::LOGGER.warn "Will use slow ruby crypto. Please consider installing OpenSSL for Ruby."

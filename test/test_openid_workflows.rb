@@ -1,6 +1,6 @@
-require 'helper'
+require File.dirname(__FILE__) + '/helper'
 require 'fileutils'
-require 'testable_openid_fetcher'
+require File.dirname(__FILE__) + '/testable_openid_fetcher'
 
 class TestOpenIDWorkflows < Pasaporte::WebTest
   # We have to open up because it's the Fecther that's going

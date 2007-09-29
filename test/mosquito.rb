@@ -89,7 +89,7 @@ end
 class Mosquito::MockRequest
   # Should be a StringIO. However, you got some assignment methods that will
   # stuff it with encoded parameters for you
-  attr_accessor :body
+  attr_accessor :body, :headers
   
   DEFAULT_HEADERS = {
     'SERVER_NAME' => 'test.host',

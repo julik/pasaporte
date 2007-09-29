@@ -1,4 +1,5 @@
-require 'helper'
+require File.dirname(__FILE__) + '/helper'
+
 class TestSettings < Test::Unit::TestCase
   CONFIG = File.dirname(Pasaporte::PATH) + '/pasaporte/config.yml'
   

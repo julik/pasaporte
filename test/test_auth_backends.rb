@@ -1,4 +1,4 @@
-require 'helper'
+require File.dirname(__FILE__) + '/helper'
 
 silence_warnings do
   require 'auth/yaml_table'
