@@ -8,7 +8,7 @@ begin
     def self._bignos(*args)
       # The trick here is that Integer#to_bn does not work because you need to feed strings
       args.map do |a| 
-        raise ArgumentError, "Cannot convert nil to OSSL bignum!" if a.nil?
+        raise ArgumentError, "Cannot convert nil to OpenSSL bignum!" if a.nil?
         OpenSSL::BN.new(a.to_s)
       end
     end
@@ -30,7 +30,7 @@ begin
     end
   end
 rescue LoadError
-  Pasaporte::LOGGER.warn "Will use slow ruby crypto. Please consider installing OpenSSL for Ruby."
+  puts "Will use slow ruby crypto. Please consider installing OpenSSL for Ruby."
 end
 
 # Redirect the logging to Pasaporte

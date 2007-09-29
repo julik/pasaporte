@@ -6,7 +6,7 @@ class TestableOpenidFetcher
   # We need a separate Mosquito tester class for things that will
   # happen via POST, because this is a different flow - 
   # the requests of the server instead of the browser. 
-  # If you post directly from the same test case you are destroying the
+  # If you post directly from the same test case you are wiring yourself into the
   # session ID that has been gotten by the simulated browser, that's why we use that.
   class OpenidPoster < Pasaporte::WebTest
     attr_reader :request, :response
@@ -57,12 +57,12 @@ class NetHTTPFetcher
     
   def get(url, params = nil)
     test_case = self.class.requestor
+    
     test_case.request.headers.merge!(params)
     test_case.get(url)
-    
     resp = test_case.response
     mokie = Camping::H.new
-    mokie.body = test_case.response.body.to_s
+    mokie.headers, mokie.body = test_case.response.headers, test_case.response.body.to_s
     [url, mokie]
   end
 end

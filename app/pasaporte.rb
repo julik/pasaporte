@@ -1,11 +1,12 @@
 %w( rubygems logger camping camping/session).map{|g| require g }
 $: << File.dirname(__FILE__) + '/pasaporte'
 
+Camping.goes :Pasaporte
+
 # Suppress the annoying require_gem warning in OpenID libs
 silence_warnings { require 'openid' }
 require 'faster_openid'
 
-Camping.goes :Pasaporte
 
 module Pasaporte
   MAX_FAILED_LOGIN_ATTEMPTS = 3
@@ -31,8 +32,7 @@ module Pasaporte
   COUNTRIES = YAML::load(File.read(File.dirname(PATH) + '/pasaporte/iso_countries.yml')) #:nodoc:
   TIMEZONES = YAML::load(File.read(File.dirname(PATH) + '/pasaporte/timezones.yml')).sort{|e1, e2| e1[1] <=> e2[1]} #:nodoc:
   
-  DOCTYPE = %[<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">] #:nodoc:
+  DOCTYPE = %[<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">] #:nodoc:
     
   # Reads and applies pasaporte/config.yml to the constants
   def self.apply_config!
@@ -52,10 +52,10 @@ module Pasaporte
   # Adds a magicvar that gets cleansed akin to Rails Flash
   module CampingFlash
     def service(*a)
-      expire= (@state && @state[:msg])
+      expire= (@state && @state.msg)
       returning(super(*a)) do
         # Expire the message if it was there before the action
-        @state.delete(:msg) if (@state && expire)
+        @state.delete('msg') if (@state && expire)
       end
     end
   end
@@ -70,7 +70,7 @@ module Pasaporte
       def _redir_to_login_page!(persistables)
         @state.merge!(persistables)
         # Prevent Camping from munging our URI with the mountpoint
-        @state[:msg] ||= "First you will need to login"
+        @state.msg ||= "First you will need to login"
         LOGGER.info "Suspending #{@nickname} until he is logged in"
         raise PleaseLogin
       end
@@ -107,8 +107,8 @@ module Pasaporte
       rescue FullStop
         return self
       rescue PleaseLogin
-        # This bypasses a session generation bug
-#        @headers['Set-Cookie'] = 'camping_sid=%s; path=/' % @cookies.camping_sid 
+        # This bypasses a session generation bug - http://code.whytheluckystiff.net/camping/ticket/143
+        @headers['Set-Cookie'] = 'camping_sid=%s; path=/' % @cookies.camping_sid 
         redirect R(Pasaporte::Controllers::Signon, @nickname)
         return self
       rescue Throttled
@@ -355,16 +355,12 @@ module Pasaporte
     # requesting party, GET is for the browser
     class Openid < personal(:openid)
       include OpenID::Server
-  
-      # This is more useful as a way to avoid returning and related errors
-      class Err < RuntimeError #:nodoc
-        attr_reader :r
-        def initialize(bubbled_openid_response); @r = bubbled_openid_response; end
-      end
+      
+      class Err < RuntimeError; end #:nodoc
       class NeedsApproval < RuntimeError; end  #:nodoc
       class Denied < Err; end  #:nodoc
       class NoOpenidRequest < RuntimeError; end  #:nodoc
-  
+      
       def get(nick)
         @nickname = nick
         # Force a session save
@@ -372,21 +368,21 @@ module Pasaporte
         begin
           @oid_request = openid_request_from_input_or_session
           
-          LOGGER.info "OpenID check - user must not be throttled"
+          LOGGER.info "pasaporte: user #{@nickname} must not be throttled"
           deny_throttled!
           
-          LOGGER.info "OpenID check - nick must match the identity URL"
+          LOGGER.info "pasaporte: nick must match the identity URL"
           check_nickname_matches_identity_url
           
-          LOGGER.info "OpenID check - user must be logged in"
+          LOGGER.info "pasaporte: user must be logged in"
           check_logged_in
           
           @profile = profile_by_nickname(@nickname)
           
-          LOGGER.info "OpenID check - trust root is on the approvals list"
+          LOGGER.info "pasaporte: trust root is on the approvals list"
           check_if_previously_approved
           
-          LOGGER.info "OpenID check complete, redirecting"
+          LOGGER.info "pasaporte: OpenID verified, redirecting"
           
           succesful_resp = @oid_request.answer(true)
           add_sreg(@oid_request, succesful_resp)
@@ -394,7 +390,7 @@ module Pasaporte
         rescue NoOpenidRequest
           return 'This is an OpenID server endpoint.'
         rescue ProtocolError => e
-          LOGGER.error "Cannot decode the OpenID request - #{e}:#{e.message}"
+          LOGGER.error "pasaporte: Cannot decode the OpenID request - #{e.message}"
           return "Something went wrong processing your request"
         rescue PleaseLogin => e
           # There is a subtlety here. If the user had NO session before entering
@@ -402,13 +398,13 @@ module Pasaporte
           # will loose his openid request.
           @oid_request.immediate ? ask_user_to_approve : (raise e)
         rescue NeedsApproval
-          LOGGER.warn "FAIL - This URL needs approval first"
+          LOGGER.warn "pasaporte: suspend - the URL needs approval first"
           ask_user_to_approve
         rescue Denied => d
-          LOGGER.warn "FAIL - OpenID authorization denied to #{@nickname} - #{d.message}"
+          LOGGER.warn "pasaporte: deny OpenID to #{@nickname} - #{d.message}"
           send_openid_response(@oid_request.answer(false))
         rescue Secure::Throttled => e
-          LOGGER.warn "FAIL - #{@nickname} is throttled, aborting OpenID"
+          LOGGER.warn "pasaporte: deny OpenID to #{@nickname} - user is throttled"
           send_openid_response(@oid_request.answer(false))
         end
       end
@@ -428,10 +424,10 @@ module Pasaporte
         if input.keys.grep(/openid/).any?
           @state.delete(:pending_openid)
           r = openid_server.decode_request(input)
-          LOGGER.info "Starting a new OpenID procedure with #{r.trust_root}"
+          LOGGER.info "Starting a new OpenID session with #{r.trust_root}"
           @state.pending_openid = r
         elsif @state.pending_openid
-          LOGGER.info "Resuming an OpenID procedure with #{@state.pending_openid.trust_root}"
+          LOGGER.info "Resuming an OpenID session with #{@state.pending_openid.trust_root}"
           @state.pending_openid
         else
           raise NoOpenidRequest
@@ -479,7 +475,7 @@ module Pasaporte
       end
     end
     
-    # Return the yadis autodiscovery segment for the user
+    # Return the yadis autodiscovery XML for the user
     class Yadis < personal(:yadis)
       def get(nick)
         @nickname = nick
@@ -530,7 +526,7 @@ module Pasaporte
           @state.sess_key = @profile.generate_sess_key
           
           # Recet the grace counter
-          @state[:failed_logins] = 0
+          @state.failed_logins = 0
           LOGGER.info "#{@nickname} logged in okay"
           
           # If we have a suspended OpenID procedure going on - continue
@@ -555,7 +551,7 @@ module Pasaporte
         "lookup (or remember) your password. See you later."
         Throttle.set!(env)
   
-        @state[:failed_logins] = 0
+        @state.failed_logins = 0
         LOGGER.info "#{env['REMOTE_ADDR']} - Throttling #{@nickname}"
   
         # If we still have an OpenID request hanging about we need
@@ -585,7 +581,7 @@ module Pasaporte
     # Logout the user, remove associations and session
     class Signout < personal(:signout)
       def get(nick)
-        return '' unless @state[:nickname] == nick
+        return '' unless (@state.nickname == nick)
         # reset the session
         @state = {:msg => "Thanks for using the service and goodbye"}
         redirect R(Signon, nick)
@@ -635,8 +631,12 @@ module Pasaporte
         require_login!
         _collapse_checkbox_input(input)
         @profile = Profile.find_or_create_by_nickname_and_domain_name(nick, my_domain)
-        @profile.update_attributes(input.profile)
-        @state[:msg] = "Your settings have been changed"
+        if @profile.update_attributes(input.profile)
+          @msg = "Your settings have been changed"
+        else
+          @err = "Cannot save your profile: <b>%s</b>" % @profile.errors.full_messages
+        end
+        
         render :profile_form
       end
     end
@@ -821,12 +821,10 @@ module Pasaporte
           script :type=>'text/javascript', :src => _s("pasaporte.js")
           title(@title || ('%s : pasaporte' % env['SERVER_NAME']))
         end
-
+        
         body do
           div.work! :class => (is_logged_in? ? "logdin" : "notAuth") do
-            returning(@msg || @state[:msg]) do | m |
-              div.msg!{m} if m
-            end
+            returning(@err || @msg || @state.msg) {| m | div.msg!{m} if m } 
             self << yield
           end
         end
@@ -910,8 +908,9 @@ module Pasaporte
 
     def profile_form
       form(:method => :post) do
+        
         h2 "Your profile"
-
+        
         label.cblabel :for => :share_info do
           _cbox :profile, :shared, :id => :share_info 
           self << '&#160; Share your info on your OpenID page'

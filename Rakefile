@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'active_support'
 require 'hoe'
-require 'app/pasaporte'
+require File.dirname(__FILE__) + '/app/pasaporte'
 $KCODE = 'u'
 
 # Disable spurious warnings when running tests, ActiveMagic cannot stand -w
