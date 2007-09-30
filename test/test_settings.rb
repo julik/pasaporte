@@ -1,6 +1,6 @@
 require File.dirname(__FILE__) + '/helper'
 
-class TestSettings < Test::Unit::TestCase
+class TestSettings < Camping::Test
   CONFIG = File.dirname(Pasaporte::PATH) + '/pasaporte/config.yml'
   
   def test_application

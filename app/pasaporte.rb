@@ -934,8 +934,8 @@ module Pasaporte
         h2 "The sites you trust"
         p { small "These sites will be able to automatically log you in without first asking you to approve"}
         ul do
-          @approvals.map do | app |
-            li { self << app; a "Remove", :href => R(DeleteApproval, app.id) }
+          @approvals.map do | approval |
+            li { approval }
           end
         end
       end

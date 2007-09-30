@@ -16,7 +16,6 @@ end
 
 Test::Unit::TestCase.fixture_path = File.dirname(__FILE__) + "/fixtures/"
 ActiveRecord::Base.logger = Logger.new("/dev/null") # SAILENS!
-
 Pasaporte::LOGGER.level = Logger::INFO
 
 def mock_auth(log, pass, dom)
@@ -25,18 +24,27 @@ def mock_auth(log, pass, dom)
   logins.index(log) && (logins.index(log) == passes.index(pass))
 end
 
+test_logger = Logger.new(File.dirname(__FILE__) + "/test.log")
+
 silence_warnings do
-  Pasaporte.const_set(:LOGGER, Logger.new(File.dirname(__FILE__) + "/test.log"))
+  Pasaporte.const_set(:LOGGER, test_logger)
   Pasaporte.const_set(:AUTH, lambda{|l, p, d| mock_auth(l, p, d) })
 end
-
+ActiveRecord::Base.logger = test_logger
 
 ActiveRecord::Migration.suppress_messages { Pasaporte.create }
+
 include Pasaporte::Models
 
 class Pasaporte::WebTest < Camping::WebTest
   def setup
     super; @class_name_abbr = 'Pasaporte'
+  end
+  
+  def prelogin(login)
+    flexmock(Pasaporte::AUTH).
+      should_receive(:call).with(login, "schweet", @request.domain).once.and_return(true)
+    post "/#{login}/signon", :pass => "schweet"
   end
   
   attr_reader :html_document

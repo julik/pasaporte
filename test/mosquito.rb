@@ -38,52 +38,34 @@ module Mosquito
   def self.unstash #:nodoc:
     x, @stashed = @stashed, nil; x
   end
+  
+  module Dusty
+    ##
+    # From Jay Fields.
+    #
+    # Allows tests to be specified as a block.
+    #
+    #   test "should do this and that" do
+    #     ...
+    #   end
+
+    def test(name, &block)
+      test_name = :"test_#{name.gsub(' ','_')}"
+      raise ArgumentError, "#{test_name} is already defined" if self.instance_methods.include? test_name.to_s
+      define_method test_name, &block
+    end
+  end
 end
 
-ActiveRecord::Base.establish_connection(:adapter => 'sqlite3', :database => ":memory:")
+in_mem_sqlite = {:adapter => 'sqlite3', :database => ":memory:"}
+ActiveRecord::Base.establish_connection(in_mem_sqlite)
+ActiveRecord::Base.configurations['test'] = in_mem_sqlite.stringify_keys
+
 ActiveRecord::Base.logger = Logger.new("test/test.log") rescue Logger.new("test.log")
 
 # This needs to be set relative to the file where the test comes from, NOT relative to the
 # mosquito itself
 Test::Unit::TestCase.fixture_path = "test/fixtures/"
-
-class Test::Unit::TestCase #:nodoc:
-  def create_fixtures(*table_names)
-    if block_given?
-      self.class.fixtures(*table_names) { |*anything| yield(*anything) }
-    else
-      self.class.fixtures(*table_names)
-    end
-  end
-  
-  def self.fixtures(*table_names)
-    if block_given?
-      Fixtures.create_fixtures(Test::Unit::TestCase.fixture_path, table_names) { yield }
-    else
-      Fixtures.create_fixtures(Test::Unit::TestCase.fixture_path, table_names)
-    end
-  end
-
-  ##
-  # From Jay Fields.
-  #
-  # Allows tests to be specified as a block.
-  #
-  #   test "should do this and that" do
-  #     ...
-  #   end
-  
-  def self.test(name, &block)
-    test_name = :"test_#{name.gsub(' ','_')}"
-    raise ArgumentError, "#{test_name} is already defined" if self.instance_methods.include? test_name.to_s
-    define_method test_name, &block
-  end
-
-  # Turn off transactional fixtures if you're working with MyISAM tables in MySQL
-  self.use_transactional_fixtures = true
-  # Instantiated fixtures are slow, but give you @david where you otherwise would need people(:david)
-  self.use_instantiated_fixtures  = false
-end
 
 # Mock request is used for composing the request body and headers
 class Mosquito::MockRequest
@@ -347,6 +329,7 @@ class Mosquito::MockUpload < StringIO
     info = " @size='#{length}' @filename='#{original_filename}' @content_type='#{content_type}'>"
     super[0..-2] + info
   end
+
 end
 
 # Stealing our assigns the evil way. This should pose no problem
@@ -366,11 +349,28 @@ module Mosquito::Proboscis #:nodoc:
 end
 
 module Camping
-
+  
+  # The basic Mosquito-wielding test case with some infrastructure
   class Test < Test::Unit::TestCase
-
-    def test_dummy; end #:nodoc
-
+    class << self; include Mosquito::Dusty; end
+    
+    def test_default; end #:nodoc
+    
+    # This is needed because Rails fixtures actually try to setup twice
+    self.use_transactional_fixtures = false
+    
+    # This is a removal for Rails fixture metamagic
+    def self.method_added(*a); end  #:nodoc:
+    
+    def setup #:nodoc:
+      setup_with_fixtures
+    end
+    
+    def teardown #:nodoc:
+      teardown_with_fixtures
+      super # This is good for people who use flexmock/mocha
+    end
+    
     # The reverse of the reverse of the reverse of assert(condition)
     def deny(condition, message='')
       assert !condition, message
@@ -411,9 +411,10 @@ module Camping
     # Gives you access to the instance variables assigned by the controller 
     attr_reader :assigns
     
-    def test_dummy; end #:nodoc
+    def test_default; end #:nodoc
     
     def setup
+      super
       @class_name_abbr = self.class.name.gsub(/^Test/, '')
       @request = Mosquito::MockRequest.new
       @cookies, @response, @assigns = {}, {}, {}
@@ -425,21 +426,21 @@ module Camping
     end
 
     # Send a POST request to a URL. All requests except GET will allow
-    # setting verbatim URL-encoded parameters as the third argument instead
+    # setting verbatim request body as the third argument instead
     # of a hash.
     def post(url, post_vars={})
       send_request url, post_vars, 'POST'
     end
 
     # Send a DELETE request to a URL. All requests except GET will allow
-    # setting verbatim URL-encoded parameters as the third argument instead
+    # setting verbatim request body as the third argument instead
     # of a hash.
     def delete(url, vars={})
       send_request url, vars, 'DELETE'
     end
 
     # Send a PUT request to a URL. All requests except GET will allow
-    # setting verbatim URL-encoded parameters as the third argument instead
+    # setting verbatim request body as the third argument instead
     # of a hash.
     def put(url, vars={})
       send_request url, vars, 'PUT'
@@ -581,7 +582,7 @@ module Camping
   
   # Used to test the models - no infrastructure will be created for running the request
   class ModelTest < Test
-    def test_dummy; end #:nodoc
+    def test_default; end #:nodoc
   end
   
   # Deprecated but humane

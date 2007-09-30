@@ -145,3 +145,36 @@ class TestSignout < Pasaporte::WebTest
     assert_equal %w( msg ), @state.keys, "State should only contain the message"
   end
 end
+
+class TestApprovalsPage < Pasaporte::WebTest
+  fixtures :pasaporte_profiles, :pasaporte_approvals
+  def test_approvals_page_requires_login
+    get '/julik/approvals'
+    assert_response :redirect
+  end
+  
+  def test_approvals_page_shows_useful_approvals_when_they_are_present
+    prelogin "julik"
+    
+    get '/julik/approvals'
+    assert_response :success
+    
+    assert_equal Profile.find_by_nickname('julik').approvals, @assigns.approvals
+    assert_match_body /The sites you trust/
+  end
+  
+  def test_approvals_page_does_not_show_empty_lists
+    Profile.find_by_nickname('julik').approvals.destroy_all
+    prelogin 'julik'
+    get '/julik/approvals'
+    assert_no_match_body /The sites you trust/
+  end
+end
+
+at_exit do
+  missing = Pasaporte::Controllers.constants.reject do |c|
+    Object.constants.map{|e|e.to_s}.include?("Test#{c}")
+  end
+  puts "\nMissing tests for controllers #{missing.to_sentence}"
+end
+
