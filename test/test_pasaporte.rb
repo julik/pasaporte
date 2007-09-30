@@ -44,7 +44,12 @@ class TestProfilePage < Pasaporte::WebTest
     assert_response :success
     assert_nil @assigns.profile, "A profile page for someone who never logged in does not show any details"
   end
-    
+  
+  def test_user_info_sets_yadis_headers
+    get '/julik'
+    assert_not_nil @response.headers['X-XRDS-Location']
+    assert_equal "http://test.host/pasaporte/julik/yadis", @response.headers['X-XRDS-Location']
+  end
 end
 
 class TestSignon < Pasaporte::WebTest
