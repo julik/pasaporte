@@ -11,13 +11,16 @@ class TestOpenIDWorkflows < Pasaporte::WebTest
   def setup
     super
     @fetcher = TestableOpenidFetcher.new(self)
+    
     # You MIGHT have thought that using a MemoryStore would be faster. HA!
     # Laughable, but it's actually much slower.
     # MemoryStore - 29s, FilesystemStore - 18s
     @store = OpenID::FilesystemStore.new('openid-consumer-store')
     @openid_session = {}
     init_consumer
-    @request['HTTP_HOST'] = @request['SERVER_NAME'] = 'test.host'
+    
+    @request.domain = 'test.host'
+    
     @trust_root = 'http://tativille.fr/wiki'
     @return_to = 'http://tativille.fr/wiki/signup'
     @hulot = Profile.find(1)

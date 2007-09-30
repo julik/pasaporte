@@ -89,7 +89,8 @@ end
 class Mosquito::MockRequest
   # Should be a StringIO. However, you got some assignment methods that will
   # stuff it with encoded parameters for you
-  attr_accessor :body, :headers
+  attr_accessor :body
+  attr_reader :headers
   
   DEFAULT_HEADERS = {
     'SERVER_NAME' => 'test.host',
@@ -114,7 +115,8 @@ class Mosquito::MockRequest
     'HTTP_CONNECTION' => 'keep-alive',
     'REQUEST_METHOD' => 'GET',
   }
-
+  
+  
   def initialize
     @headers = DEFAULT_HEADERS.with_indifferent_access # :-)
     @body = StringIO.new('hello Camping')
@@ -345,7 +347,6 @@ class Mosquito::MockUpload < StringIO
     info = " @size='#{length}' @filename='#{original_filename}' @content_type='#{content_type}'>"
     super[0..-2] + info
   end
-
 end
 
 # Stealing our assigns the evil way. This should pose no problem
@@ -446,7 +447,7 @@ module Camping
 
     # Send any request. We will try to guess what you meant - if there are uploads to be
     # processed it's not going to be a GET, that's for sure.
-    def send_request(url, post_vars, method)
+    def send_request(composite_url, post_vars, method)
       
       if method.to_s.downcase == "get"
         @request.query_string_params = post_vars
@@ -455,9 +456,7 @@ module Camping
       end
       
       # If there is some stuff in the URL to be used as a query string, why ignore it?
-      url, qs_from_url = url.split(/\?/)
-      
-      url = relativize_url(url)
+      relative_url, qs_from_url = relativize_url(composite_url)
       
       @request.append_to_query_string(qs_from_url) if qs_from_url
       
@@ -465,8 +464,9 @@ module Camping
       @request['REQUEST_METHOD'] = method
       
       @request['SCRIPT_NAME'] = '/' + @class_name_abbr.downcase
-      @request['PATH_INFO'] = '/' + url
+      @request['PATH_INFO'] = '/' + relative_url
       
+      # We need to munge this because the PATH_INFO has changed
       @request['REQUEST_URI'] = [@request.SCRIPT_NAME, @request.PATH_INFO].join('').squeeze('/')
       unless @request['QUERY_STRING'].blank?
         @request['REQUEST_URI'] += ('?' + @request['QUERY_STRING']) 
@@ -482,14 +482,17 @@ module Camping
       
       # Run the request
       @response = eval("#{@class_name_abbr}.run @request.body, @request")
+      
+      # Downgrade the disguised Mab into a string
+      @response.body = @response.body.to_s
       @assigns = Mosquito::unstash
       
       # We need to restore the cookies separately so that the app
       # restores our session on the next request. We retrieve cookies and
       # the session in their assigned form instead of parsing the headers and
       # doing a deserialization cycle 
-      @cookies = @assigns[:cookies] || H[{}]
-      @state = @assigns[:state] || H[{}]
+      @cookies = @assigns.cookies || H[{}]
+      @state = @assigns.state || H[{}]
       
       if @response.headers['X-Sendfile']
         @response.body = File.read(@response.headers['X-Sendfile'])
@@ -565,14 +568,14 @@ module Camping
       end
       
       def relativize_url(url)
-        return url unless url =~ /^([a-z]+):\//
-        
-        p = URI.parse(url)
-        unless p.host == @request.domain
+        parsed = URI.parse(url)
+        if !parsed.scheme.blank? && parsed.host != @request.domain
           raise ::Mosquito::NonLocalRequest, 
-          "You tried to callout to #{p} which is outside of the test domain"
+            "You tried to callout to '#{parsed}' which is outside of the test domain (#{@request.domain})"
         end
-        p.path + (p.query.blank? ? '' : "?#{p.query}")
+        # Now remove the path
+        parsed.path.gsub!(/^\/#{@class_name_abbr.downcase}\//, '/')
+        [parsed.path, parsed.query]
       end
   end
   

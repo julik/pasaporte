@@ -1,0 +1,12 @@
+monsieur_hulot_and_playtime:
+  id: 1
+  profile_id: 1
+  trust_root: http://playtime.fr/
+monsieur_hulot_and_imdb:
+  id: 2
+  profile_id: 1
+  trust_root: http://www.imdb.com/title/tt0062136/
+julik_and_openidenabled:
+  id: 3
+  profile_id: 2
+  trust_root: http://openidenabled.com

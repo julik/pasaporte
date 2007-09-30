@@ -590,7 +590,7 @@ module Pasaporte
       end
       private
       def punish_the_violator
-        @report = "I am blacklisting you for some time so that you can " +
+        @report = "I am stopping you from sending logins for some time so that you can " +
         "lookup (or remember) your password. See you later."
         Throttle.set!(env)
   
@@ -624,9 +624,10 @@ module Pasaporte
     # Logout the user, remove associations and session
     class Signout < personal(:signout)
       def get_with_nick
-        return '' unless (@state.nickname == @nickname)
+        (redirect R(Signon, @nickname); return) unless is_logged_in?
         # reset the session
-        @state = {:msg => "Thanks for using the service and goodbye"}
+        @state = Camping::H.new
+        @state.msg = "Thanks for using the service and goodbye"
         redirect R(Signon, @nickname)
       end
     end
@@ -726,11 +727,10 @@ module Pasaporte
     class ProfilePage < personal
       def get(nick)
         @nickname = nick
-        _todo("fix the yadis header")
-        #       @headers['X-XRDS-Location'] = "http://localhost:3301/#{@nickname}/yadis"
+        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
         @title = "#{@nickname}'s profile" 
-        @profile = Profile.find_by_nickname_and_domain_name_and_shared(@nickname, my_domain, true)
-        render(@profile ? :profile_public_page : :endpoint_splash)
+        @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
+        render(@profile && @profile.shared? ? :profile_public_page : :endpoint_splash)
       end
     end
   end

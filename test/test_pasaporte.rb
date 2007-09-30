@@ -3,10 +3,6 @@ require 'flexmock'
 
 class TestProfilePage < Pasaporte::WebTest
   fixtures :pasaporte_profiles
-  def setup
-    super
-    @request.domain = "id.company.net"
-  end
 
   def test_user_info_page_for_user_who_never_logged_in
     get '/unknown-stranger'
@@ -53,10 +49,6 @@ end
 
 class TestSignon < Pasaporte::WebTest
   fixtures :pasaporte_profiles
-  def setup
-    super
-    @request.domain = "id.company.net"
-  end
   
   def teardown
     returning(super) {Throttle.delete_all }
@@ -70,7 +62,7 @@ class TestSignon < Pasaporte::WebTest
   
   def test_posting_to_signon_should_call_auth_and_fail
     flexmock(Pasaporte::AUTH).
-        should_receive(:call).with("julik", "trance", "id.company.net").
+        should_receive(:call).with("julik", "trance", "test.host").
         at_least.once.and_return(false)
     
     post '/julik/signon', :pass => "trance"
@@ -83,7 +75,7 @@ class TestSignon < Pasaporte::WebTest
   
   def test_posting_false_login_many_times_winds_the_failed_login_counter
     flexmock(Pasaporte::AUTH).
-        should_receive(:call).with("julik", "trance", "id.company.net").
+        should_receive(:call).with("julik", "trance", "test.host").
         at_least.twice.and_return(false)
     post '/julik/signon', :pass => "trance"
     post '/julik/signon', :pass => "trance"
@@ -92,7 +84,7 @@ class TestSignon < Pasaporte::WebTest
   
   def test_past_the_failed_login_threshold_should_trottle
     flexmock(Pasaporte::AUTH).
-        should_receive(:call).with("julik", "trance", "id.company.net").at_least.once.and_return(false)
+        should_receive(:call).with("julik", "trance", "test.host").at_least.once.and_return(false)
     
     Pasaporte::MAX_FAILED_LOGIN_ATTEMPTS.times { post '/julik/signon', :pass => "trance" }
     assert_response :success
@@ -102,7 +94,7 @@ class TestSignon < Pasaporte::WebTest
   
   def test_post_with_good_auth_shold_fetch_profile_munge_session_and_redirect
     flexmock(Pasaporte::AUTH).
-        should_receive(:call).with("julik", "junkman", "id.company.net").once.and_return(true)
+        should_receive(:call).with("julik", "junkman", "test.host").once.and_return(true)
     
     post '/julik/signon', :pass => 'junkman'
     
@@ -116,7 +108,7 @@ class TestSignon < Pasaporte::WebTest
   
   def test_post_with_good_auth_should_create_profiles_if_necessary
     flexmock(Pasaporte::AUTH).
-        should_receive(:call).with("gemanges", "tairn", "id.company.net").once.and_return(true)
+        should_receive(:call).with("gemanges", "tairn", "test.host").once.and_return(true)
     
     post '/gemanges/signon', :pass => 'tairn'
     assert_response :redirect
@@ -124,5 +116,27 @@ class TestSignon < Pasaporte::WebTest
     assert_not_nil @assigns.profile, "The profile should have been hooked up"
     assert_equal 'gemanges', @assigns.profile.nickname
     deny @assigns.profile.new_record?
+  end
+end
+
+class TestSignout < Pasaporte::WebTest
+  def test_signout_should_silently_redirect_unless_signed_in
+    get '/somebody/signout'
+    assert_response :redirect
+    assert_redirected_to '/somebody/signon'
+  end
+  
+  def test_signout_should_erase_session_and_redirect
+    flexmock(Pasaporte::AUTH).
+        should_receive(:call).with("gemanges", "tairn", "test.host").once.and_return(true)
+    post '/gemanges/signon', :pass => 'tairn'
+    assert_response :redirect
+    assert_equal 'gemanges', @state.nickname
+    
+    get '/gemanges/signout'
+    assert_response :redirect
+    assert_redirected_to '/gemanges/signon'
+    assert_kind_of Camping::H, @state, "State should be reset with Camping::H"
+    assert_equal %w( msg ), @state.keys, "State should only contain the message"
   end
 end

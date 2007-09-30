@@ -16,7 +16,7 @@ monsieur_hulot:
 julik:
   id: 2
   nickname: "julik"
-  domain_name: "id.company.net"
+  domain_name: "test.host"
   dob: <%= Date.parse("15-10-1983").to_s(:db) %>
   fullname: Julik Tarkhanov
   gender: 'm'
@@ -28,7 +28,7 @@ julik:
 max:
   id: 3
   nickname: "max"
-  domain_name: "id.company.net"
+  domain_name: "test.host"
   dob: <%= Date.parse("15-10-1983").to_s(:db) %>
   fullname: Max Lapshin
   gender: 'm'
