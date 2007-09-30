@@ -289,6 +289,30 @@ class TestYadis < Pasaporte::WebTest
   end
 end
 
+class TestPublicSignon < Pasaporte::WebTest
+  test 'should present a login screen without predefined nickname' do
+    get
+    assert_response :success
+    assert_select 'input[name="login"]', true
+    
+    flexmock(Pasaporte::AUTH).should_receive(:call).with("schtwo", "foo", "test.host").and_return(false)
+    
+    post '/', :login => 'schtwo', :pass => 'foo'
+    assert_response :success
+    assert_nil @state.nickname
+    assert @response.body.include?('Your name:<b>schtwo</b>'),
+      "The response should include text now instead of a login field"
+  end
+  
+  test 'should redirect to edit page after a succesful login' do
+    flexmock(Pasaporte::AUTH).should_receive(:call).with("somebdy", "pfew", "test.host").and_return(true)
+    post '/', :login => "somebdy", :pass => "pfew"
+    assert_response :redirect
+    assert_redirected_to '/somebdy/edit'
+  end
+  
+end
+
 # A littol auditte
 at_exit do
   missing = Pasaporte::Controllers.constants.reject do |c|
@@ -296,4 +320,3 @@ at_exit do
   end
   puts "\nMissing tests for controllers #{missing.to_sentence}"
 end
-

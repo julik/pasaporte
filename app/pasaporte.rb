@@ -543,6 +543,10 @@ module Pasaporte
       def post
         # encode the input and forward it to the private login page
         y = Pasaporte.post(:Signon, input.login, {"env"=>env, "input" => input})
+        if y.status == 302
+          @status, @headers['Location'] = 302, y.headers['Location']; return
+        end
+        # r does not work quite well for redirects (well it kinda does but not always)
         r(y.status, y.body, y.headers)
       end
     end
@@ -581,13 +585,14 @@ module Pasaporte
           # we need to take care of that and tell the OID consumer that we want to restart
           # from a different profile URL
           @state.nickname = @nickname
-          
           @profile = profile_by_nickname(@nickname)
           
           # Recet the grace counter
           @state.failed_logins = 0
-          LOGGER.info "#{@nickname} logged in okay"
           
+          # Enforce a cookie 
+          @headers['Set-Cookie'] = 'camping_sid=%s; path=/' % @cookies.camping_sid 
+
           # If we have a suspended OpenID procedure going on - continue
           redirect R((@state.pending_openid ? Openid : ProfileEditor), @nickname); return
         else
@@ -845,7 +850,13 @@ module Pasaporte
       form.signon! :method => :post do
         label :for => 'login' do
           self << "Your name:"
-          @nickname ? b(@nickname) : input.login!(:name => "login", :value => @nickname)
+          # We include a hidden input here but it's only ever used by PublicSignon
+          if @nickname
+            b(@nickname)
+            input(:name => "login", :value => @nickname, :type => :hidden)
+          else
+            input.login!(:name => "login", :value => @nickname)
+          end
         end
         label :for => 'pass' do
           self << "Your password:"
