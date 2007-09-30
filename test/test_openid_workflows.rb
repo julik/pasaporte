@@ -2,7 +2,7 @@ require File.dirname(__FILE__) + '/helper'
 require 'fileutils'
 require File.dirname(__FILE__) + '/testable_openid_fetcher'
 
-class TestOpenIDWorkflows < Pasaporte::WebTest
+class TestOpenid < Pasaporte::WebTest
   # We have to open up because it's the Fecther that's going
   # to make requests
   attr_reader :request, :response
