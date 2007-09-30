@@ -496,8 +496,24 @@ module Pasaporte
       def get_with_nick
         @headers["Content-type"] = "application/xrds+xml"
         @skip_layout = true
-        render :yadis
+        return '<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)" xmlns:openid="http://openid.net/xmlns/1.0">
+        <XRD>
+        <Service priority="1">
+        <Type>http://openid.net/signon/1.0</Type>
+        <URI>%s</URI>
+        <openid:Delegate>%s</openid:Delegate>
+        </Service>
+        </XRD>
+        </xrds:XRDS>' % get_endpoints
+        
       end
+      private
+        def get_endpoints
+          defaults = [_our_endpoint_uri]*2
+          @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
+          return defaults unless @profile && @profile.delegates_openid?
+          [@profile.openid_server, @profile.openid_delegate]
+        end
     end
     
     class ApprovalsPage < personal(:approvals)
@@ -1061,20 +1077,6 @@ module Pasaporte
     # or he hasn't authenticated with us yet
     def endpoint_splash
       h3 { "This is <b>#{@nickname}'s</b> page" }
-    end
-
-    # Render the YADIS metadata
-    def yadis
-      endpoint = R(Openid, @nick)
-      self << '<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)" xmlns:openid="http://openid.net/xmlns/1.0">
-      <XRD>
-      <Service priority="1">
-      <Type>http://openid.net/signon/1.0</Type>
-      <URI>%s</URI>
-      <openid:Delegate>%s</openid:Delegate>
-      </Service>
-      </XRD>
-      </xrds:XRDS>' % [endpoint, endpoint]
     end
   end
 

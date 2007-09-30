@@ -1,4 +1,6 @@
 require File.dirname(__FILE__) + '/helper'
+require File.dirname(__FILE__) + '/testable_openid_fetcher'
+
 require 'flexmock'
 
 class TestProfilePage < Pasaporte::WebTest
@@ -257,6 +259,34 @@ class TestProfileEditor < Pasaporte::WebTest
     end
   end
   
+end
+
+class TestYadis < Pasaporte::WebTest
+  attr_reader :request, :response
+  fixtures :pasaporte_profiles
+  
+  def setup
+    super; NetHTTPFetcher.requestor = self
+  end
+  
+  test 'should return YADIS info with proper URLs' do
+    get '/julik/yadis'
+    assert_response :success
+    assert_equal "application/xrds+xml",  @response.headers["Content-type"]
+    assert !@response.body.empty?, "Body cannot be empty"
+  end
+  
+  test 'should be usable for yadis discovery' do
+    assert_nothing_raised { @discovery = YADIS.new('http://test.host/julik/yadis') }
+    assert_kind_of ServiceEndpoint, @discovery.services[0]
+    assert_equal "http://test.host/pasaporte/julik/openid", @discovery.services[0].uri
+  end
+
+  test 'should redirect yadis discovery to the delegate' do
+    assert_nothing_raised { @discovery = YADIS.new('http://test.host/hans/yadis') }
+    assert_kind_of ServiceEndpoint, @discovery.services[0]
+    assert_equal "http://hans.myopenid.com", @discovery.services[0].uri
+  end
 end
 
 at_exit do

@@ -36,3 +36,10 @@ max:
   shared: 1
   postcode: 3524
   info: "Promised to help with Pasaporte but didn't"
+  
+delegated_profile:
+  id: 4
+  nickname: "hans"
+  domain_name: "test.host"
+  openid_server: "http://hans.myopenid.com"
+  openid_delegate: "http://hans.myopenid.com"
