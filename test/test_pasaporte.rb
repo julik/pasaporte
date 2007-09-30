@@ -289,6 +289,7 @@ class TestYadis < Pasaporte::WebTest
   end
 end
 
+# A littol auditte
 at_exit do
   missing = Pasaporte::Controllers.constants.reject do |c|
     Object.constants.map{|e|e.to_s}.include?("Test#{c}")
