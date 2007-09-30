@@ -171,6 +171,42 @@ class TestApprovalsPage < Pasaporte::WebTest
   end
 end
 
+class TestAssets < Pasaporte::WebTest
+  def test_get_nonexistent_url_sets_404
+    get '/assets/habduda'
+    assert_response 404
+  end
+  
+  def test_get_with_dir_traversal
+    ref_path = File.dirname(Pasaporte::PATH) + '/pasaporte/assets/etc/passwd'
+    
+    flexmock(File).should_receive(:exist?).with(ref_path).once.and_return(false)
+    get '/assets/../../../../../etc/passwd'
+    assert_response 404
+  end
+  
+  def test_should_return_stylesheet
+    get '/assets/pasaporte.css'
+    assert_response :success
+    assert_equal 'text/css', @response.headers['Content-Type'], "Should set the content type to text/css"
+    assert_match_body /Superresetthemall/
+  end
+  
+  def test_grabbing_an_asset_sets_magic_headers
+    get '/assets/pasaporte.css'
+    magic_headers = %w( Last-Modified Expires Cache-Control Last-Modified )
+    for h in magic_headers
+      assert_not_nil @response.headers[h], "The header #{h} should be set"
+    end
+  end
+  
+  def test_should_return_304_on_conditional_get
+    @request.headers['HTTP_IF_MODIFIED_SINCE'] = Time.now.to_s(:http)
+    get '/assets/pasaporte.css'
+    assert_response 304
+  end
+end
+
 at_exit do
   missing = Pasaporte::Controllers.constants.reject do |c|
     Object.constants.map{|e|e.to_s}.include?("Test#{c}")

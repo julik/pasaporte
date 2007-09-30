@@ -358,18 +358,18 @@ module Camping
     
     # This is needed because Rails fixtures actually try to setup twice
     self.use_transactional_fixtures = false
-    
-    # This is a removal for Rails fixture metamagic
-    def self.method_added(*a); end  #:nodoc:
-    
-    def setup #:nodoc:
-      setup_with_fixtures
-    end
-    
-    def teardown #:nodoc:
-      teardown_with_fixtures
-      super # This is good for people who use flexmock/mocha
-    end
+#   
+#   # This is a removal for Rails fixture metamagic
+#   def self.method_added(*a); end  #:nodoc:
+#   
+#   def setup #:nodoc:
+#     setup_with_fixtures
+#   end
+#   
+#   def teardown #:nodoc:
+#     teardown_with_fixtures
+#     super # This is good for people who use flexmock/mocha
+#   end
     
     # The reverse of the reverse of the reverse of assert(condition)
     def deny(condition, message='')

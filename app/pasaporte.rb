@@ -683,7 +683,7 @@ module Pasaporte
         'html' => 'text/html', 'css' => 'text/css', 'js' => 'text/javascript', 
         'jpg' => 'image/jpeg', 'gif' => 'image/gif', 'png' => 'image/png'
       }
-      ASSETS = File.dirname(__FILE__) + '/pasaporte/assets/'
+      ASSETS = File.join File.dirname(Pasaporte::PATH), 'pasaporte/assets/'
   
       def get(path)
         if env["HTTP_IF_MODIFIED_SINCE"]
@@ -693,7 +693,8 @@ module Pasaporte
   
         # Squeeze out all possible directory traversals
         path = File.join ASSETS, path.gsub(/\.\./, '').gsub(/\s/, '')
-  
+        path.squeeze!('/')
+        
         # Somehow determine if we support sendfile, because sometimes we dont
         if File.exist?(path)
           ext = File.extname(path).gsub(/^\./, '')
