@@ -1,0 +1,2 @@
+* Proper flow when the user logs in but has no site to go to
+* Fast-track whitelist for intranets (no "Decide" screen) 
