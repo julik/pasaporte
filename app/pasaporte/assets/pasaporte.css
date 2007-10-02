@@ -75,6 +75,9 @@ html {
   border-left: none;
 }
 
+.ProfilePage #work {
+  background-position: 0px -5px;
+}
 /* Show a red bar until the user is authed */
 #work.notAuth { background-image: url("mainbg_red.gif"); }
 

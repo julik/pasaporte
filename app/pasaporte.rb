@@ -102,6 +102,7 @@ module Pasaporte
     def service(*a)
       begin
         expire_old_sessions!
+        @ctr = self.class.to_s.split('::').pop
         super(*a)
       rescue FullStop
         return self
@@ -752,6 +753,7 @@ module Pasaporte
         @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
         @title = "#{@nickname}'s profile" 
         @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
+        @no_toolbar = true
         render(@profile && @profile.shared? ? :profile_public_page : :endpoint_splash)
       end
     end
@@ -882,17 +884,19 @@ module Pasaporte
           script :type=>'text/javascript', :src => _s("pasaporte.js")
           title(@title || ('%s : pasaporte' % env['SERVER_NAME']))
         end
-        
-        body do
-          div.toolbar! do
-            if is_logged_in?
-              a.loginBtn! "Log out", :href => R(Signout, @nickname)
-              b.profBtn! @nickname.capitalize
-            else
-              b.loginBtn! "You are not logged in"
+        body :class => @ctr do
+          unless @no_toolbar
+            div.toolbar! do
+              if is_logged_in?
+                a.loginBtn! "Log out", :href => R(Signout, @nickname)
+                b.profBtn! @nickname.capitalize
+              else
+                b.loginBtn! "You are not logged in"
+              end
+              img :src => R(Assets, '/openid.png'), :alt => 'OpenID system'
             end
-            img :src => R(Assets, '/openid.png'), :alt => 'OpenID system'
           end
+          
           div.work! :class => (is_logged_in? ? "logdin" : "notAuth") do
             returning(@err || @msg || @state.msg) {| m | div.msg!{m} if m } 
             self << yield
@@ -905,7 +909,7 @@ module Pasaporte
     def _s(file)
       R(Assets, file)
     end
-
+    
     # Render either our server URL or the URL of the delegate
     def _openid_server_uri
       (@profile && @profile.delegates_openid?) ? @profile.openid_server : _our_endpoint_uri
@@ -1019,7 +1023,7 @@ module Pasaporte
           self << %Q[ attachCheckbox("share_info", "persinfo");]
         end
 
-        h2 "Simple registration data"
+        h2 "Simple registration info"
         p.sml 'When you register on some sites they can ' +
         'use this info to fill their registration forms ' +
         'for you'
@@ -1084,7 +1088,7 @@ module Pasaporte
         end
 
         hr
-        input :type=>:submit, :value=>'Save' # or Cancel
+        input :type=>:submit, :value=>'Save my settings' # or Cancel
       end
     end
 
