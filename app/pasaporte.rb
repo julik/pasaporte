@@ -646,7 +646,7 @@ module Pasaporte
     class Signout < personal(:signout)
       def get_with_nick
         (redirect R(Signon, @nickname); return) unless is_logged_in?
-        # reset the session
+        # reset the session in our part only
         @state = Camping::H.new
         @state.msg = "Thanks for using the service and goodbye"
         redirect R(Signon, @nickname)
@@ -884,6 +884,15 @@ module Pasaporte
         end
         
         body do
+          div.toolbar! do
+            if is_logged_in?
+              a.loginBtn! "Log out", :href => R(Signout, @nickname)
+              b.profBtn! @nickname.capitalize
+            else
+              b.loginBtn! "You are not logged in"
+            end
+            img :src => R(Assets, '/openid.png'), :alt => 'OpenID system'
+          end
           div.work! :class => (is_logged_in? ? "logdin" : "notAuth") do
             returning(@err || @msg || @state.msg) {| m | div.msg!{m} if m } 
             self << yield
