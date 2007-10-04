@@ -34,8 +34,6 @@ rescue LoadError
 end
 
 # Redirect the logging to Pasaporte
-def OpenID::Util
-  def self.log(message)
-    Pasaporte::LOGGER.info('OpenID: ' + message)
-  end
+def OpenID::Util.log(message)
+  Pasaporte::LOGGER.info('OpenID: ' + message)
 end
