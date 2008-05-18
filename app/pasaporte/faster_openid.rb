@@ -3,7 +3,7 @@
 # 19 seconds with this. Lo and behold.
 begin
   require 'openssl'
-  module OpenID::Util
+  module ::OpenID::Util
     # Convert any number of ints to OpenSSL bignums
     def self._bignos(*args)
       # The trick here is that Integer#to_bn does not work because you need to feed strings
@@ -34,7 +34,7 @@ rescue LoadError
 end
 
 # Redirect the logging to Pasaporte
-module OpenID::Util
+module ::OpenID::Util
   def self.log(message)
     Pasaporte::LOGGER.info('OpenID: ' + message)
   end
