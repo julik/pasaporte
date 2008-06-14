@@ -484,6 +484,9 @@ module Camping
       # Run the request
       @response = eval("#{@class_name_abbr}.run @request.body, @request")
       
+      # Add content_type to response
+      eval("class << @response; def content_type; @headers['Content-Type']; end; end")
+      
       # Downgrade the disguised Mab into a string
       @response.body = @response.body.to_s
       @assigns = Mosquito::unstash

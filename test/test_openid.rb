@@ -37,7 +37,7 @@ class TestOpenid < Pasaporte::WebTest
   
   def teardown
     # Delete all the associations created during the test case
-    Camping::Models::Session.delete_all; Association.delete_all; Approval.delete_all; Throttle.delete_all
+    JulikState::State.delete_all; Association.delete_all; Approval.delete_all; Throttle.delete_all
     # Delete the store
     FileUtils.rm_rf('openid-consumer-store')
     # Call super for flexmock a.o.
@@ -105,7 +105,7 @@ class TestOpenid < Pasaporte::WebTest
     assert_response :redirect
     assert_redirected_to '/monsieur-hulot/signon', "Monsieur should be asked to login"
     
-    post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+    prelogin!
     assert_response :redirect
     assert_redirected_to '/monsieur-hulot/openid',
       "The redirection should be to the continuation of the OpenID procedure"
@@ -122,8 +122,8 @@ class TestOpenid < Pasaporte::WebTest
   def test_in_which_monsieur_hulot_blindly_trusts_tativille
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
-    post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
-
+    prelogin!
+    
     follow_redirect # back to openid
     assert_redirected_to '/monsieur-hulot/decide', "Should send Monsieur Hulot to the page " +
       "where he will confirm himself trusting the Tativille"
@@ -144,7 +144,7 @@ class TestOpenid < Pasaporte::WebTest
   end
   
   def test_in_which_monsieur_hulot_decides_not_to_trust_tativille
-    post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+    prelogin!
     
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
@@ -244,9 +244,10 @@ class TestOpenid < Pasaporte::WebTest
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
     assert_redirected_to '/monsieur-hulot/signon'
-    Pasaporte::MAX_FAILED_LOGIN_ATTEMPTS.times do
+    (Pasaporte::MAX_FAILED_LOGIN_ATTEMPTS + 1).times do
       post '/monsieur-hulot/signon', :pass => 'cartouche'
     end
+    puts @response.body
     assert_response :redirect
     path, qs = redirect_path_and_params
     assert_kind_of OpenID::CancelResponse, @consumer.complete(qs),

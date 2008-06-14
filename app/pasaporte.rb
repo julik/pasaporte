@@ -5,8 +5,9 @@ Camping.goes :Pasaporte
 
 # Suppress the annoying require_gem warning in ruby-yadis
 silence_warnings { require 'openid' }
-require 'faster_openid'
 
+# TODO - this does not work with current lib ### require 'faster_openid'
+require 'julik_state'
 
 module Pasaporte
   MAX_FAILED_LOGIN_ATTEMPTS = 3
@@ -96,7 +97,8 @@ module Pasaporte
     
     def expire_old_sessions!
       day_zero = (Time.now - SESSION_LIFETIME).to_s(:db)
-      Camping::Models::Session.delete_all("created_at < '%s'" % day_zero)
+      # JulikState.expire_old(SESSION_LIFETIME)
+      # Camping::Models::Session.delete_all("created_at < '%s'" % day_zero)
     end
     
     def service(*a)
@@ -107,8 +109,6 @@ module Pasaporte
       rescue FullStop
         return self
       rescue PleaseLogin
-        # This bypasses a session generation bug - http://code.whytheluckystiff.net/camping/ticket/143
-        @headers['Set-Cookie'] = 'camping_sid=%s; path=/' % @cookies.camping_sid 
         redirect R(Pasaporte::Controllers::Signon, @nickname)
         return self
       rescue Throttled
@@ -132,7 +132,7 @@ module Pasaporte
   # The order here is important. Camping::Session has to come LAST (innermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, Secure, Camping::Session].map{|m| include m }
+  [CampingFlash, Secure, JulikState].map{|m| include m }
 
   module Models
     
@@ -596,8 +596,7 @@ module Pasaporte
           # Recet the grace counter
           @state.failed_logins = 0
           
-          # Enforce a cookie 
-          @headers['Set-Cookie'] = 'camping_sid=%s; path=/' % @cookies.camping_sid 
+          # Enforce a cookie - removed
 
           # If we have a suspended OpenID procedure going on - continue
           redirect R((@state.pending_openid ? Openid : ProfileEditor), @nickname); return
@@ -803,7 +802,7 @@ module Pasaporte
       required = openid_request.query['openid.sreg.required']
       optional = openid_request.query['openid.sreg.optional']
       policy_url = openid_request.query['openid.sreg.policy_url']
-  
+      
       something_needed = required || optional || policy_url
       if block_given? && something_needed
         yield(required.split(',') + optional.split(','), policy_url)
@@ -1111,7 +1110,7 @@ module Pasaporte
   end
 
   def self.create
-    ::Camping::Models::Session.create_schema
+    JulikState.create_schema
     self::Models.create_schema
   end
 end

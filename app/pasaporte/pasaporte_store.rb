@@ -27,14 +27,13 @@ class PasaporteStore < ::OpenID::Store::Interface
       Association.find_all_by_server_url_and_handle(server_url, handle)
 
     assocs.reverse.each do |assoc|
-      a = assoc.from_record    
-      if a.expired?
+      if assoc.expired?
         assoc.destroy
       else
-        return a
+        return assoc.from_record
       end
     end if assocs.any?
-
+    
     return nil
   end
 
