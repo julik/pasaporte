@@ -169,11 +169,11 @@ class TestOpenid < Pasaporte::WebTest
   def test_in_which_monsieur_hulot_already_approved_tativille_and_is_logged_in
     prelogin!; preapprove!
     
-    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot", immediate = false)
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
     path, qs = redirect_path_and_params
-    assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
     assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, path), "The response is positive"
+    assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
   end
   
   def test_in_which_monsieur_hulot_uses_immediate_mode_and_the_mode_totally_works

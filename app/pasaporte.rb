@@ -458,7 +458,6 @@ module Pasaporte
         end
       end
       
-      # FIXME - the claimed ID that comes in is somehow empty
       def check_nickname_matches_identity_url
         nick_from_uri = @oid_request.identity.to_s.split(/\//)[-2]
         if (nick_from_uri != @nickname)
@@ -673,7 +672,7 @@ module Pasaporte
       def post_with_nick
         require_login
         if !@state.pending_openid
-          @report = "There is no more OpenID request to approve. Looks like it went out already."
+          @report = "There is no OpenID request to approve anymore. Looks like it went out already."
           render :bailout
         elsif input.nope
           @oid_request = @state.delete(:pending_openid)
@@ -791,7 +790,8 @@ module Pasaporte
       @server ||= OpenID::Server::Server.new(@store, @env['SERVER_NAME'])
       @server
     end
-  
+    
+    # FIXME - this is not compatible with OpenID lib 2
     # Add sreg details from Mai Profail to the response
     def add_sreg(request, response)
       # The user should be able to approve the transfer
@@ -800,7 +800,8 @@ module Pasaporte
         response.add_fields('sreg', @profile.to_sreg_fields(fields))
       end
     end
-  
+
+    # FIXME - this is not compatible with OpenID lib 2
     def when_sreg_is_required(openid_request)
       required = openid_request.query['openid.sreg.required']
       optional = openid_request.query['openid.sreg.optional']
