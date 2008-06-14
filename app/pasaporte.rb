@@ -451,8 +451,9 @@ module Pasaporte
         end
       end
       
+      # FIXME - the claimed ID that comes in is somehow empty
       def check_nickname_matches_identity_url
-        nick_from_uri = @oid_request.claimed_id.to_s.split(/\//)[-2]
+        nick_from_uri = @oid_request.identity.to_s.split(/\//)[-2]
         if (nick_from_uri != @nickname)
           raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
         end
