@@ -44,7 +44,7 @@ class TestOpenid < Pasaporte::WebTest
     super
   end
   
-  def xtest_default_discovery_page_sports_right_server_url
+  def test_default_discovery_page_sports_right_server_url
     get '/monsieur-hulot'
     assert_response :success
     assert_select 'link[rel=openid.server]', true do | s |

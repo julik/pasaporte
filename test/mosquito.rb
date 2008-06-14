@@ -477,12 +477,14 @@ module Camping
         @request['HTTP_COOKIE'] = @cookies.map {|k,v| "#{k}=#{Camping.escape(v)}" }.join('; ')
       end
       
-      # Inject the proboscis if we haven't already done so
-      pr = Mosquito::Proboscis
-      eval("#{@class_name_abbr}.send(:include, pr) unless #{@class_name_abbr}.ancestors.include?(pr)")
+      # Get the Camping app
+      app_module = Kernel.const_get(@class_name_abbr)
       
-      # Run the request
-      @response = eval("#{@class_name_abbr}.run @request.body, @request")
+      # Inject the proboscis if we haven't already done so
+      app_module.send(:include, Mosquito::Proboscis) unless app_module.ancestors.include?(Mosquito::Proboscis)
+      
+      # Run the request. Do not use eval because 
+      @response = app_module.run @request.body, @request
       
       # Add content_type to response
       eval("class << @response; def content_type; @headers['Content-Type']; end; end")

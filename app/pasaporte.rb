@@ -280,7 +280,9 @@ module Pasaporte
         ALLOW_DELEGATION && (!openid_server.blank? && !openid_delegate.blank?)
       end
       alias_method :delegates_openid, :delegates_openid? # for checkboxes
-  
+      
+      def to_s; nickname; end
+      
       private
       def validate_delegate_uris
         if ([self.openid_server, self.openid_delegate].select{|i| i.blank?}).length == 1
@@ -433,6 +435,7 @@ module Pasaporte
   
       def post_with_nick
         req = openid_server.decode_request(input)
+        raise "This is not an OpenID request" if req.nil?
         # Check for dumb mode HIER!
         resp = openid_server.handle_request(req)
         # we need to preserve the session on POST actions
@@ -876,8 +879,7 @@ module Pasaporte
     def layout
       @headers['Cache-Control'] = 'no-cache; must-revalidate'
       if @skip_layout
-        self << yield
-        return
+        self << yield; return
       end
 
       @headers['Content-type'] = 'text/html'
@@ -974,6 +976,7 @@ module Pasaporte
       h2 { "Hello " + b(@profile) }
       p do
         self << "You are now logged in. Pass the following address to any OpenID-enabled site that you want to visit"
+        br
         b _our_identity_url
       end
       if @approvals.any?
@@ -984,6 +987,8 @@ module Pasaporte
             li { approval }
           end
         end
+      else
+        p "You did not yet authorize any sites to use your OpenID"
       end
     end
     
