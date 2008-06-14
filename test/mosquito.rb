@@ -483,7 +483,7 @@ module Camping
       # Inject the proboscis if we haven't already done so
       app_module.send(:include, Mosquito::Proboscis) unless app_module.ancestors.include?(Mosquito::Proboscis)
       
-      # Run the request. Do not use eval because 
+      # Run the request. Do not use eval because
       @response = app_module.run @request.body, @request
       
       # Add content_type to response

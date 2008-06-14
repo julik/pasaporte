@@ -435,7 +435,7 @@ module Pasaporte
   
       def post_with_nick
         req = openid_server.decode_request(input)
-        raise "This is not an OpenID request" if req.nil?
+        raise ProtocolError, "The decoded request was nil" if req.nil?
         # Check for dumb mode HIER!
         resp = openid_server.handle_request(req)
         # we need to preserve the session on POST actions

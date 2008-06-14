@@ -22,15 +22,14 @@ class TestableOpenidFetcher
   
   def get(uri, headers = {})
     # @browser_getter.request.headers.merge!(headers || {})
-    puts [uri, headers].inspect
+   # $stderr.puts "Simulating a GET from the client browser to #{uri}"
     @browser_getter.get relativized(uri) # this fails somehow
     @browser_getter.response
   end
   
-  def post(uri, body, headers = {})
+  def post(uri, headers = {}, body = '')
     # @server_poster.request.headers.merge!(headers || {})
-    puts [uri, body, headers].inspect
-    
+   # $stderr.puts "Simulating a POST from the OpenID consumer to #{uri} with #{body.length} bytes of payload"
     @server_poster.post relativized(uri), body
     @server_poster.response
   end
