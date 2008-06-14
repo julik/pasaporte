@@ -3,8 +3,8 @@ $: << File.dirname(__FILE__) + '/pasaporte'
 
 Camping.goes :Pasaporte
 
-# Suppress the annoying require_gem warning in ruby-yadis
-silence_warnings { require 'openid' }
+require 'openid'
+require 'openid/extensions/sreg'
 
 # TODO - this does not work with current lib ### require 'faster_openid'
 require 'julik_state'
@@ -806,11 +806,14 @@ module Pasaporte
 
     # FIXME - this is not compatible with OpenID lib 2
     def when_sreg_is_required(openid_request)
+      fetch_request = OpenID::SReg::Request.from_openid_request(openid_request)
+      return unless fetch_request
+      
       required = openid_request.query['openid.sreg.required']
       optional = openid_request.query['openid.sreg.optional']
       policy_url = openid_request.query['openid.sreg.policy_url']
       
-      something_needed = required || optional || policy_url
+      something_needed = fetch_request.were_fields_requested?
       if block_given? && something_needed
         yield(required.split(',') + optional.split(','), policy_url)
       else
