@@ -589,11 +589,14 @@ module Pasaporte
         # If the user reaches the failed login limit we ban him for a while and
         # tell the OpenID requesting party to go away
         if Pasaporte::AUTH.call(@nickname, input.pass, my_domain)
+          LOGGER.info "#{@nickname} logged in, setting state"
           # Special case - if the login ultimately differs from the one entered
           # we need to take care of that and tell the OID consumer that we want to restart
           # from a different profile URL
           @state.nickname = @nickname
           @profile = profile_by_nickname(@nickname)
+          
+          LOGGER.info "In state: #{@state.keys.inspect}"
           
           # Recet the grace counter
           @state.failed_logins = 0

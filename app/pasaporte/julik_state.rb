@@ -20,16 +20,15 @@ module JulikState
   RC = [*'A'..'Z'] + [*'0'..'9'] + [*'a'..'z']
   def _sid; (0...32).inject("") { |ret,_| ret << RC[rand(RC.length)] }; end
   def _appn; self.class.to_s.split(/::/).shift; end
-  def _ivar; @state ||= Camping::H[]; end
-  def _gc
-  end
   
   def service(*a)
     fresh = Camping::H[{}]
     s = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(:app => _appn, :blob => fresh,
-      :sid => (@cookies.jlive_sid = _sid))
-    _ivar.replace s.blob
-    @msg = _ivar.delete(:msg)
-    returning(super(*a)) {  s.update_attributes(:blob => _ivar) unless s.blob == _ivar }
+      :sid => (@cookies.jsid ||= _sid))
+    @state = s.blob.dup
+    @msg = @state.delete(:msg)
+    returning(super(*a)) do
+      s.update_attributes :blob => @state if (@state != s.blob)
+    end
   end
 end
