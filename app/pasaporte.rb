@@ -290,7 +290,7 @@ module Pasaporte
   
         %w(openid_server openid_delegate).map do | attr |
           return if self[attr].blank?
-          flattened = OpenID::Util.normalize_url(self[attr])
+          flattened = OpenID::URINorm.urinorm(self[attr])
           self[attr] = (flattened || (errors.add(attr, 'Only HTTP protocol addresses can be used'); self[attr]))
         end
       end
@@ -452,9 +452,9 @@ module Pasaporte
       end
       
       def check_nickname_matches_identity_url
-        nick_from_uri = @oid_request.identity_url.to_s.split(/\//)[-2]
+        nick_from_uri = @oid_request.claimed_id.to_s.split(/\//)[-2]
         if (nick_from_uri != @nickname)
-          raise Denied, "The identity '#{@oid_request.identity_url}' does not mach the URL realm"
+          raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
         end
   
         if (@state.nickname && (nick_from_uri != @state.nickname))
@@ -780,7 +780,8 @@ module Pasaporte
   
     def openid_server
       @store ||= PasaporteStore.new
-      @server ||= OpenID::Server::Server.new(@store)
+      # we also need to provide endopint URL - this is where Pasaporte is mounted
+      @server ||= OpenID::Server::Server.new(@store, @env['SERVER_NAME'])
       @server
     end
   
@@ -815,7 +816,7 @@ module Pasaporte
         when OpenID::Server::HTTP_OK
           @body = web_response.body           
         when OpenID::Server::HTTP_REDIRECT
-          redirect web_response.redirect_url
+          redirect web_response.headers['location']
         else # This is a 400 response, we do not support something
           @status, @body = 400, web_response.body
       end
@@ -923,12 +924,12 @@ module Pasaporte
     # Canonicalized URL of our endpoint    
     def _our_endpoint_uri
       uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
-      OpenID::Util.normalize_url(uri)
+      OpenID::URINorm.urinorm(uri)
     end
     
     def _our_identity_url
       uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(ProfilePage, @nickname)].join('/').squeeze('/')
-      OpenID::Util.normalize_url(uri)
+      OpenID::URINorm.urinorm(uri)
     end
 
     # HTML esc. snatched off ERB

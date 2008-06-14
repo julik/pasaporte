@@ -1,4 +1,5 @@
-class PasaporteStore < ::OpenID::Store
+require 'openid/store/interface'
+class PasaporteStore < ::OpenID::Store::Interface
   include ::Pasaporte::Models
 
   def get_auth_key

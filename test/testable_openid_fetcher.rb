@@ -15,19 +15,45 @@ class TestableOpenidFetcher
   
   def initialize(test_case)
     @browser_getter = test_case
+    @browser_getter.request.headers['HTTP_HOST'] = 'test.host'
     @server_poster = OpenidPoster.new("test_foo")
     @server_poster.setup # manually yes
-    NetHTTPFetcher.requestor = @server_poster
   end
   
-  def get(uri)
+  def get(uri, headers = {})
     @browser_getter.get relativized(uri)
-    [uri, @browser_getter.response.body]
+    @browser_getter.response
   end
   
-  def post(uri, body)
+  def post(uri, body, headers = {})
     @server_poster.post relativized(uri), body
-    [uri, @server_poster.response.body]
+    @server_poster.response
+  end
+  
+  # This is used by OpenID lib 2
+  def fetch(url, body=nil, headers=nil, redirect_limit=10)
+    url, url_stringified = URI::parse(url), url.dup
+    
+    camping_controller_with_response =  (body.blank? ? get(url.request_uri) : post(url.request_uri, body))
+    ::OpenID::HTTPResponse._from_net_response(FakeResponse.new(camping_controller_with_response), url_stringified)
+  end
+  
+  class FakeResponse < ::Net::HTTPResponse
+    def initialize(mosquito_response)
+      @the = mosquito_response
+      super('1.0', @the.status.to_s, 'Found') # http version, resp code and message
+      
+      flat_headers = @the.headers.inject({}) { |n, k| n.merge k[0] => k[1].to_s }
+      initialize_http_header(flat_headers)
+    end
+    
+    def body
+      @the.body
+    end
+    
+    def code
+      @the.status.to_s
+    end
   end
   
   private
@@ -36,33 +62,9 @@ class TestableOpenidFetcher
       # OpenID gets confused and actually posts into it
       # - Mosquito does not like that
       u = URI.parse(uri)
-      unless (u.host == @browser_getter.request.http_host)
+      unless ((u.host == @browser_getter.request.http_host) || u.host.blank?)
         raise ExternalResource, "OpenID consumer wants to have #{u}"
       end
       u.path.gsub(/^\/pasaporte/, '')
     end
-end
-
-# And this bitch is for Ruby Yadis (which slows the testing down on my G5 about 30 times, thanks folks)
-class NetHTTPFetcher
-  def self.requestor=(x)
-    @requestor = x
-  end
-  
-  def self.requestor
-    @requestor
-  end
-  
-  def initialize(no_op=20, no_op_two=20); end
-    
-  def get(url, params = nil)
-    test_case = self.class.requestor
-    
-    test_case.request.headers.merge!(params)
-    test_case.get(url)
-    resp = test_case.response
-    mokie = Camping::H.new
-    mokie.headers, mokie.body = test_case.response.headers, test_case.response.body.to_s
-    [url, mokie]
-  end
 end

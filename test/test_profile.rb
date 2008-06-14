@@ -4,6 +4,10 @@ class TestProfile < Camping::ModelTest
   DOMAIN = 'my-pasaporte.com'
   fixtures :pasaporte_profiles
   
+  def test_aa_fixtures_loaded
+    assert_equal 4, Profile.count
+  end
+  
   def test_assumes_localhost_as_default_domain
     @profile = Profile.new
     assert_equal 'localhost', @profile.domain_name

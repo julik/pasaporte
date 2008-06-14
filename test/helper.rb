@@ -1,11 +1,15 @@
-require File.dirname(__FILE__) + '/mosquito'
+require 'rubygems'
+#gem 'activesupport', '<=2.0.2'
+$:.reject! { |e| e.include? 'TextMate' }
+
 require File.dirname(__FILE__) + '/../app/pasaporte'
+require File.dirname(__FILE__) + '/mosquito'
 
 require 'flexmock'
 require 'flexmock/test_unit'
 
 # for assert_select and friends
-require 'action_pack'
+require 'action_controller'
 require 'action_controller/assertions'
 
 class Pasaporte::Controllers::ServerError
@@ -37,6 +41,12 @@ ActiveRecord::Migration.suppress_messages { Pasaporte.create }
 include Pasaporte::Models
 
 class Pasaporte::WebTest < Camping::WebTest
+  if respond_to?(:set_fixture_class)
+    set_fixture_class :pasaporte_approvals => Pasaporte::Models::Approval,
+                      :pasaporte_profiles => Pasaporte::Models::Profile,
+                      :pasaporte_throttles => Pasaporte::Models::Throttle
+  end
+  
   def setup
     super; @class_name_abbr = 'Pasaporte'
   end
