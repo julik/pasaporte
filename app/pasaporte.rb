@@ -316,6 +316,10 @@ module Pasaporte
       def from_record
         OpenID::Association.new(handle, secret, issued, lifetime, assoc_type)
       end
+      
+      def expired?
+        Time.now.to_i > (issued + lifetime)
+      end
     end
    
     # Set throttles
