@@ -135,20 +135,20 @@ module Pasaporte
   [CampingFlash, Secure, JulikState].map{|m| include m }
 
   module Models
-    
+    MAX = :limit # Thank you rails core, it was MAX before
     class CreatePasaporte < V 1.0
       def self.up
         create_table :pasaporte_profiles, :force => true do |t|
           # http://openid.net/specs/openid-simple-registration-extension-1_0.html
-          t.column :nickname, :string, :maxlength => 20
-          t.column :email, :string, :maxlength => 70
-          t.column :fullname, :string, :maxlength => 50
+          t.column :nickname, :string, MAX => 20
+          t.column :email, :string, MAX => 70
+          t.column :fullname, :string, MAX => 50
           t.column :dob, :date, :null => true
-          t.column :gender, :string, :maxlength => 1
-          t.column :postcode, :string, :maxlength => 10
-          t.column :country, :string, :maxlength => 2
-          t.column :language, :string, :maxlength => 5
-          t.column :timezone, :string, :maxlength => 50
+          t.column :gender, :string, MAX => 1
+          t.column :postcode, :string, MAX => 10
+          t.column :country, :string, MAX => 2
+          t.column :language, :string, MAX => 5
+          t.column :timezone, :string, MAX => 50
   
           # And our extensions
           # is the profile shared (visible to others)
@@ -202,7 +202,7 @@ module Pasaporte
   
         create_table :pasaporte_throttles do |t|
           t.column :created_at, :datetime
-          t.column :client_fingerprint, :string, :maxlength => 40
+          t.column :client_fingerprint, :string, MAX => 40
         end
       end
   

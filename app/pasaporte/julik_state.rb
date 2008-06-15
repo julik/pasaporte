@@ -8,10 +8,10 @@ module JulikState
     ActiveRecord::Schema.define do
       create_table :julik_states do | s |
         s.column :blob, :text
-        s.column :sid, :string, :length => 32
+        s.column :sid, :string, :limit => 32
+        s.column :app, :string, :null => false, :limit => 50
         s.column :modified_at, :datetime
         s.column :created_at, :datetime
-        s.column :app, :string, :null => false
       end
       add_index :julik_states, [:sid, :app], :unique => true
       State.reset_column_information
