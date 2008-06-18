@@ -1,6 +1,6 @@
 =begin
 ActiveDirectory-Exchange-Blaggh authentication guerilla-style. Will take the give username and password and try to authenticate
-them against the give Remote Web Workplace server. This assumes that the user on a domain also has an email address
+them against the given Remote Web Workplace server. This assumes that the user on a domain also has an email address
 with OWA of course. If the user is found RWW will give us a specific response. No credentials or user information is
 retrieved.
 =end

@@ -907,7 +907,7 @@ module Pasaporte
               else
                 b.loginBtn! "You are not logged in"
               end
-              img :src => R(Assets, '/openid.png'), :alt => 'OpenID system'
+              img :src => _s('openid.png'), :alt => 'OpenID system'
             end
           end
           
