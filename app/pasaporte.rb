@@ -355,12 +355,16 @@ module Pasaporte
     # get_with_nick is called, @nickname is already there.
     module Nicknames
       def get(*extras)
+        puts "Got get" #{}": #{@input.inspect}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
+        raise "#{self.class} does not respond to get_with_nick" unless respond_to?(:get_with_nick)
         get_with_nick(*extras)
       end
       
       def post(*extras)
+        puts "Got post: #{@input.inspect}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
+        raise "#{self.class} does not respond to post_with_nick" unless respond_to?(:post_with_nick)
         post_with_nick(*extras)
       end
       def respond_to?(m, *whatever)
@@ -938,6 +942,7 @@ module Pasaporte
     def _our_endpoint_uri
       uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
       OpenID::URINorm.urinorm(uri)
+      uri
     end
     
     def _our_identity_url

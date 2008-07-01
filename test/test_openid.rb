@@ -158,12 +158,12 @@ class TestOpenid < Pasaporte::WebTest
     end
     
     post '/monsieur-hulot/decide', :nope => "Oh Non!"
-    path, qs = redirect_path_and_params
+    red, path, qs = redirect_url_path_and_params
     
     assert_equal '/wiki/signup', path, 
       "The taken decision should immediately send Monsieur Hulot back to the signup page"
     assert_equal 0, Approval.count, "No Approvals should have been issued"
-    assert_kind_of OpenID::CancelResponse, @consumer.complete(qs), "The response is negative"
+    assert_kind_of OpenID::Consumer::CancelResponse, @consumer.complete(qs, red), "The response is negative"
   end
   
   def test_in_which_monsieur_hulot_already_approved_tativille_and_is_logged_in
@@ -171,8 +171,10 @@ class TestOpenid < Pasaporte::WebTest
     
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot", immediate = false)
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
-    path, qs = redirect_path_and_params
-    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, path), "The response is positive"
+    
+    redir_url, path, qs = redirect_url_path_and_params
+    
+    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, redir_url), "The response is positive"
     assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
   end
   
@@ -182,10 +184,10 @@ class TestOpenid < Pasaporte::WebTest
     assert_nothing_raised do 
       get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
     end
-    path, qs = redirect_path_and_params
+    red, path, qs = redirect_url_path_and_params
     
-    openid_resp = @consumer.complete qs
-    assert_kind_of OpenID::SuccessResponse, openid_resp
+    openid_resp = @consumer.complete(qs, red)
+    assert_kind_of OpenID::Consumer::SuccessResponse, openid_resp
   end
 
   def test_in_which_monsieur_hulot_uses_immediate_mode_but_needs_to_login_first
@@ -194,10 +196,10 @@ class TestOpenid < Pasaporte::WebTest
     assert_nothing_raised do 
       get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
     end
-    path, qs = redirect_path_and_params
-    openid_resp = @consumer.complete qs
+    red, path, qs = redirect_url_path_and_params
+    openid_resp = @consumer.complete(qs, red)
     
-    assert_kind_of OpenID::SetupNeededResponse, openid_resp, "Setup is needed for this action"
+    assert_kind_of OpenID::Consumer::SetupNeededResponse, openid_resp, "Setup is needed for this action"
     assert_not_nil qs["openid.user_setup_url"], "The setup URL should be passed"
     
     setup_path, setup_qs = redirect_path_and_params(qs["openid.user_setup_url"])
@@ -208,8 +210,9 @@ class TestOpenid < Pasaporte::WebTest
     assert_redirected_to "/monsieur-hulot/openid",
       "Monsieur is now out of the immediate mode so we continue on to the openid process"
     follow_redirect
-    path, qs = redirect_path_and_params
-    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs),
+    red, path, qs = redirect_url_path_and_params
+    
+    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, red),
       "Monsieur has now authorized Tativille, albeit not immediately"
   end
 
@@ -220,9 +223,9 @@ class TestOpenid < Pasaporte::WebTest
       get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
     end
     path, qs = redirect_path_and_params
-    openid_resp = @consumer.complete qs
+    openid_resp = @consumer.complete(qs, path)
     
-    assert_kind_of OpenID::SetupNeededResponse, openid_resp, "Setup is needed for this action"
+    assert_kind_of OpenID::Consumer::SetupNeededResponse, openid_resp, "Setup is needed for this action"
     assert_not_nil qs["openid.user_setup_url"], "The setup URL should be passed"
     
     setup_path, setup_qs = redirect_path_and_params(qs["openid.user_setup_url"])
@@ -236,7 +239,7 @@ class TestOpenid < Pasaporte::WebTest
     follow_redirect
     
     path, qs = redirect_path_and_params
-    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs),
+    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, path),
       "Monsieur has now authorized Tativille, albeit not immediately"
   end
   
@@ -250,7 +253,7 @@ class TestOpenid < Pasaporte::WebTest
     puts @response.body
     assert_response :redirect
     path, qs = redirect_path_and_params
-    assert_kind_of OpenID::CancelResponse, @consumer.complete(qs),
+    assert_kind_of OpenID::Consumer::CancelResponse, @consumer.complete(qs, path),
       "Monsieur Hulot is denied authorization with Tativille after failing so miserably"
   end
 
@@ -259,6 +262,7 @@ class TestOpenid < Pasaporte::WebTest
     
     begin
       @hulot.update_attributes :openid_delegate => d, :openid_server => d
+      
       err = assert_raise(TestableOpenidFetcher::ExternalResource, "Should go out looking for openid") do
         @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
       end
@@ -274,21 +278,22 @@ class TestOpenid < Pasaporte::WebTest
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
     assert_response :redirect
     path, qs = redirect_path_and_params
-    assert_kind_of OpenID::CancelResponse, @consumer.complete(qs),
+    assert_kind_of OpenID::Consumer::CancelResponse, @consumer.complete(qs, path),
       "Monsieur Hulot is instantly denied authorization with Tativille because he is throttled"
     assert_nil @state.pending_openid, "No OpenID request should be left dangling at this point"
   end
   
   def test_in_which_tativille_uses_dumb_mode
-    prelogin!; preapprove!
-    dumb = OpenID::DumbStore.new("les-vacances")
-    @consumer = OpenID::Consumer.new(@openid_session, dumb)
-    
-    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
-    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
-    path, qs = redirect_path_and_params
-    assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
-    assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs), "The response is positive"
+    # prelogin!; preapprove!
+    # dumb = OpenID::DumbStore.new("les-vacances")
+    # @consumer = OpenID::Consumer.new(@openid_session, dumb)
+    # 
+    # req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    # assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    # path, qs = redirect_path_and_params
+    # assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
+    # assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs), "The response is positive"
+    flunk
   end
   
   private
@@ -315,8 +320,17 @@ class TestOpenid < Pasaporte::WebTest
       Hash[*@response.body.split(/\n/).map{|p| p.split(/\:/)}.flatten].with_indifferent_access
     end
     def redirect_path_and_params(t = nil)
+      # Camping conveniently places a URI object in the location header
       uri = (t ? URI.parse(t) : @response.headers["Location"])
       [uri.path, decode_qs(uri.query)]
+    end
+    
+    def redirect_url_path_and_params(t = nil)
+      # Camping conveniently places a URI object in the location header
+      uri = (t ? URI.parse(t) : @response.headers["Location"])
+      uri_with_scheme, qry = uri.to_s.split(/\?/)
+      
+      [uri_with_scheme, uri.path, decode_qs(qry)]
     end
     
     def get_with_verbatim_url(url)
