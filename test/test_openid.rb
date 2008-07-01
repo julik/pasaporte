@@ -189,7 +189,7 @@ class TestOpenid < Pasaporte::WebTest
     openid_resp = @consumer.complete(qs, red)
     assert_kind_of OpenID::Consumer::SuccessResponse, openid_resp
   end
-
+  
   def test_in_which_monsieur_hulot_uses_immediate_mode_but_needs_to_login_first
     preapprove!
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
@@ -215,7 +215,7 @@ class TestOpenid < Pasaporte::WebTest
     assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, red),
       "Monsieur has now authorized Tativille, albeit not immediately"
   end
-
+  
   def test_in_which_monsieur_hulot_uses_immediate_mode_but_needs_to_approve_first
     prelogin!
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
@@ -256,7 +256,7 @@ class TestOpenid < Pasaporte::WebTest
     assert_kind_of OpenID::Consumer::CancelResponse, @consumer.complete(qs, path),
       "Monsieur Hulot is denied authorization with Tativille after failing so miserably"
   end
-
+  
   def test_in_which_monsieur_hulot_has_delegated
     d = "http://leopenid.fr/endpoint"
     

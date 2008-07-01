@@ -355,14 +355,14 @@ module Pasaporte
     # get_with_nick is called, @nickname is already there.
     module Nicknames
       def get(*extras)
-        puts "Got get" #{}": #{@input.inspect}"
+        puts "Got get on #{self.class}" #{}": #{@input.inspect}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to get_with_nick" unless respond_to?(:get_with_nick)
         get_with_nick(*extras)
       end
       
       def post(*extras)
-        puts "Got post: #{@input.inspect}"
+        puts "Got post on #{self.class}: #{@input.inspect}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to post_with_nick" unless respond_to?(:post_with_nick)
         post_with_nick(*extras)
@@ -505,25 +505,31 @@ module Pasaporte
     
     # Return the yadis autodiscovery XML for the user
     class Yadis < personal(:yadis)
+      YADIS_TPL = %{<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)" xmlns:openid="http://openid.net/xmlns/1.0">
+      <XRD>
+      <Service priority="1">
+      <Type>http://openid.net/signon/1.0</Type>
+      <URI>%s</URI>
+      <openid:Delegate>%s</openid:Delegate>
+      </Service>
+      </XRD>
+      </xrds:XRDS>}
+      
       def get_with_nick
         @headers["Content-type"] = "application/xrds+xml"
         @skip_layout = true
-        return '<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)" xmlns:openid="http://openid.net/xmlns/1.0">
-        <XRD>
-        <Service priority="1">
-        <Type>http://openid.net/signon/1.0</Type>
-        <URI>%s</URI>
-        <openid:Delegate>%s</openid:Delegate>
-        </Service>
-        </XRD>
-        </xrds:XRDS>' % get_endpoints
-        
+        renderd =  YADIS_TPL % get_endpoints
+        puts "Made yadis #{renderd}"
+        return renderd
       end
+      
       private
         def get_endpoints
           defaults = [_our_endpoint_uri]*2
+          puts "Default urls: #{defaults}"
           @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
           return defaults unless @profile && @profile.delegates_openid?
+          puts "Specials urls: #{[@profile.openid_server, @profile.openid_delegate].inspect}"
           [@profile.openid_server, @profile.openid_delegate]
         end
     end
@@ -892,10 +898,11 @@ module Pasaporte
       if @skip_layout
         self << yield; return
       end
-
+      
       @headers['Content-type'] = 'text/html'
       xhtml_transitional do
         head do
+          meta 'http-equiv' => 'X-XRDS-Location', :content => (_our_identity_url + '/yadis')
           link :rel => "openid.server", :href => _openid_server_uri 
           link :rel => "openid.delegate", :href => _openid_delegate_uri
           link :rel => "stylesheet", :href => _s("pasaporte.css")
