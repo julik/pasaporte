@@ -57,14 +57,14 @@ class TestableOpenidFetcher
   
   private
     def get(uri, headers = {})
-      $stderr.puts "doing get on #{uri} from OpenID"
+      Pasaporte::LOGGER.debug "OpenID requested GET on #{uri}"
       # @browser_getter.request.headers.merge!(headers || {})
       @browser_getter.get relativized(uri) # this fails somehow
       @browser_getter.response
     end
     
     def post(uri, headers = {}, body = '')
-      $stderr.puts "doing post on #{uri} from OpenID"
+      Pasaporte::LOGGER.debug "OpenID requested POST on #{uri}"
       # @server_poster.request.headers.merge!(headers || {})
       @server_poster.post relativized(uri), body
       @server_poster.response
