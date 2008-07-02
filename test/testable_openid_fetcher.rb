@@ -1,6 +1,8 @@
-# Implements OpenID::Fetcher. Will run the request through the application instead of calling
+# Implements OpenID::Fetcher. Will run the request through the mosquito test case instead of calling
 # out via HTTP
 class TestableOpenidFetcher
+  # Will be raised when the fetcher tries to get a URL which is
+  # not within the application being tested
   class ExternalResource < RuntimeError; end
 
   # We need a separate Mosquito tester class for things that will
@@ -20,24 +22,17 @@ class TestableOpenidFetcher
     @server_poster.setup # manually yes
   end
   
-  def get(uri, headers = {})
-    # @browser_getter.request.headers.merge!(headers || {})
-   # $stderr.puts "Simulating a GET from the client browser to #{uri}"
-    @browser_getter.get relativized(uri) # this fails somehow
-    @browser_getter.response
-  end
-  
-  def post(uri, headers = {}, body = '')
-    # @server_poster.request.headers.merge!(headers || {})
-   # $stderr.puts "Simulating a POST from the OpenID consumer to #{uri} with #{body.length} bytes of payload"
-    @server_poster.post relativized(uri), body
-    @server_poster.response
-  end
-  
   # This is used by OpenID lib 2
   def fetch(url, body=nil, headers=nil, redirect_limit=10)
     url, url_stringified = URI::parse(url), url.dup
+    
     h = headers || {}
+    
+    # Check if we are calling to the outside world
+    unless ((url.host == @browser_getter.request.http_host) || url.host.blank?)
+      raise ExternalResource, "OpenID consumer wants to have #{url}"
+    end
+    
     camping_controller_with_response =  (body.blank? ? get(url.request_uri, h) : post(url.request_uri, h, body))
     ::OpenID::HTTPResponse._from_net_response(FakeResponse.new(camping_controller_with_response), url_stringified)
   end
@@ -47,7 +42,6 @@ class TestableOpenidFetcher
     def initialize(mosquito_response)
       @the = mosquito_response
       super('1.0', @the.status.to_s, 'Found') # http version, resp code and message
-      
       flat_headers = @the.headers.inject({}) { |n, k| n.merge k[0] => k[1].to_s } rescue {}
       initialize_http_header(flat_headers)
     end
@@ -62,14 +56,23 @@ class TestableOpenidFetcher
   end
   
   private
+    def get(uri, headers = {})
+      # @browser_getter.request.headers.merge!(headers || {})
+      @browser_getter.get relativized(uri) # this fails somehow
+      @browser_getter.response
+    end
+    
+    def post(uri, headers = {}, body = '')
+      # @server_poster.request.headers.merge!(headers || {})
+      @server_poster.post relativized(uri), body
+      @server_poster.response
+    end
+    
     def relativized(uri)
       # Here we need to replace the mount point URL otherwise
       # OpenID gets confused and actually posts into it
       # - Mosquito does not like that
       u = URI.parse(uri)
-      unless ((u.host == @browser_getter.request.http_host) || u.host.blank?)
-        raise ExternalResource, "OpenID consumer wants to have #{u}"
-      end
       u.path.gsub(/^\/pasaporte/, '')
     end
 end

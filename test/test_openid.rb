@@ -222,14 +222,15 @@ class TestOpenid < Pasaporte::WebTest
     assert_nothing_raised do 
       get_with_verbatim_url req.redirect_url(@trust_root, @return_to, true)
     end
-    path, qs = redirect_path_and_params
-    openid_resp = @consumer.complete(qs, path)
+    redir, path, qs = redirect_url_path_and_params
+    openid_resp = @consumer.complete(qs, redir)
     
     assert_kind_of OpenID::Consumer::SetupNeededResponse, openid_resp, "Setup is needed for this action"
     assert_not_nil qs["openid.user_setup_url"], "The setup URL should be passed"
     
     setup_path, setup_qs = redirect_path_and_params(qs["openid.user_setup_url"])
-    assert_equal "/pasaporte/monsieur-hulot/decide", setup_path, "The setup path is /decide"
+    assert_equal "/pasaporte/monsieur-hulot/decide", setup_path, 
+      "The setup path is /decide because Hulot never logged in with Tativille before"
     
     get '/monsieur-hulot/decide', setup_qs
     assert_response :success
@@ -238,22 +239,24 @@ class TestOpenid < Pasaporte::WebTest
     assert_redirected_to '/monsieur-hulot/openid'
     follow_redirect
     
-    path, qs = redirect_path_and_params
-    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, path),
+    redir, path, qs = redirect_url_path_and_params
+    
+    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, redir),
       "Monsieur has now authorized Tativille, albeit not immediately"
   end
   
-  def test_in_which_monsieur_hulot_forgets_his_password_and_tativille_gets_a_refusal
+  def test_in_which_monsieur_hulot_forgets_his_password_and_tativille_gets_a_refusal_after_the_last_failed_attempt
     req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
     assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
     assert_redirected_to '/monsieur-hulot/signon'
-    (Pasaporte::MAX_FAILED_LOGIN_ATTEMPTS + 1).times do
+    (Pasaporte::MAX_FAILED_LOGIN_ATTEMPTS).times do
       post '/monsieur-hulot/signon', :pass => 'cartouche'
     end
-    puts @response.body
+    
     assert_response :redirect
-    path, qs = redirect_path_and_params
-    assert_kind_of OpenID::Consumer::CancelResponse, @consumer.complete(qs, path),
+    redir, path, qs = redirect_url_path_and_params
+    
+    assert_kind_of OpenID::Consumer::CancelResponse, @consumer.complete(qs, redir),
       "Monsieur Hulot is denied authorization with Tativille after failing so miserably"
   end
   
