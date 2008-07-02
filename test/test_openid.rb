@@ -1,7 +1,8 @@
 require File.dirname(__FILE__) + '/helper'
 require 'fileutils'
 require File.dirname(__FILE__) + '/testable_openid_fetcher'
-require 'openid/store/filesystem'
+require 'openid/store/memory'
+require 'openid/extensions/sreg'
 
 class Object
   def own_methods
@@ -21,10 +22,7 @@ class TestOpenid < Pasaporte::WebTest
     
     OpenID.fetcher = @fetcher
     
-    # You MIGHT have thought that using a MemoryStore would be faster. HA!
-    # Laughable, but it's actually much slower.
-    # MemoryStore - 29s, FilesystemStore - 18s
-    @store = OpenID::Store::Filesystem.new('openid-consumer-store')
+    @store = OpenID::Store::Memory.new
     @openid_session = {}
     init_consumer
     
@@ -263,16 +261,12 @@ class TestOpenid < Pasaporte::WebTest
   def test_in_which_monsieur_hulot_has_delegated
     d = "http://leopenid.fr/endpoint"
     
-    begin
-      @hulot.update_attributes :openid_delegate => d, :openid_server => d
+    @hulot.update_attributes :openid_delegate => d, :openid_server => d
       
-      err = assert_raise(TestableOpenidFetcher::ExternalResource, "Should go out looking for openid") do
-        @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
-      end
-      assert_equal "OpenID consumer wants to have http://leopenid.fr/endpoint", err.message 
-    ensure
-      @hulot.update_attributes :openid_delegate => nil, :openid_server => nil
+    err = assert_raise(OpenID::KVPostNetworkError, "Should go out looking for openid") do
+      @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
     end
+    assert_match /Called out to external resource/, err.message, "The external resource exception should bubble up" 
   end
   
   def test_in_which_monsieur_hulot_is_throttled_and_gets_rejected_at_once
@@ -295,6 +289,28 @@ class TestOpenid < Pasaporte::WebTest
     redir, path, qs = redirect_url_path_and_params
     assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
     assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, redir), "The response is positive"
+  end
+  
+  def test_in_which_tativille_requests_sreg
+    prelogin!; preapprove!
+    
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    sreg_request = OpenID::SReg::Request.new
+    sreg_request.request_fields(['email', 'dob'], true) # required
+    sreg_request.request_fields(['nickname', 'fullname'], false) # optional
+    req.add_extension(sreg_request)
+    
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    
+    red, path, qs = redirect_url_path_and_params
+    openid_resp = @consumer.complete(qs, red)
+    
+    assert_kind_of OpenID::Consumer::SuccessResponse, openid_resp, "Should complete succesfully"
+    
+    sreg_response = OpenID::SReg::Response.from_success_response(openid_resp)
+    assert_equal 'monsieur-hulot', sreg_response['nickname']
+    assert_equal "1953-01-12", sreg_response['dob']
+    assert_equal "Monsieur Hulot", sreg_response['fullname']
   end
   
   private

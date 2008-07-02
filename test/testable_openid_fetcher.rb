@@ -28,10 +28,7 @@ class TestableOpenidFetcher
     
     h = headers || {}
     
-    # Check if we are calling to the outside world
-    unless ((url.host == @browser_getter.request.http_host) || url.host.blank?)
-      raise ExternalResource, "OpenID consumer wants to have #{url}"
-    end
+    raise_on_external url, @browser_getter
     
     camping_controller_with_response =  (body.blank? ? get(url.request_uri, h) : post(url.request_uri, h, body))
     ::OpenID::HTTPResponse._from_net_response(FakeResponse.new(camping_controller_with_response), url_stringified)
@@ -58,14 +55,12 @@ class TestableOpenidFetcher
   private
     def get(uri, headers = {})
       Pasaporte::LOGGER.debug "OpenID requested GET on #{uri}"
-      # @browser_getter.request.headers.merge!(headers || {})
       @browser_getter.get relativized(uri) # this fails somehow
       @browser_getter.response
     end
     
     def post(uri, headers = {}, body = '')
       Pasaporte::LOGGER.debug "OpenID requested POST on #{uri}"
-      # @server_poster.request.headers.merge!(headers || {})
       @server_poster.post relativized(uri), body
       @server_poster.response
     end
@@ -76,5 +71,12 @@ class TestableOpenidFetcher
       # - Mosquito does not like that
       u = URI.parse(uri)
       u.path.gsub(/^\/pasaporte/, '')
+    end
+    
+    # Check if we are calling to the outside world
+    def raise_on_external(uri, testcase)
+      unless ((uri.host == testcase.request.http_host) || uri.host.blank?)
+        raise ExternalResource, "Called out to external resource: OpenID consumer wants to have #{uri}"
+      end
     end
 end

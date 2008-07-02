@@ -83,6 +83,18 @@ class TestProfile < Camping::ModelTest
     assert p.valid?, "As two URLs are present the profile becomes valid"
   end
   
+  def test_delegate_urls_removed_when_delegate_set_to_false
+    p = create('julik', DOMAIN, 
+      :openid_server => 'xxx.com', :openid_delegate => 'xyz.org/x')
+    assert p.delegates_openid?, "This profile delegates"
+    p.delegates_openid = false
+    p.save!
+    
+    assert p.openid_server.blank?, "The openid server should have been removed"
+    assert p.openid_delegate.blank?, "The openid delegate should have been removed"
+    deny p.delegates_openid?, "Delegation is now turned off because we sent a bool switch of false"
+  end
+  
   def test_normalizes_both_delegate_urls
     p = create('julik', DOMAIN, 
       :openid_server => 'xxx.com', :openid_delegate => 'xyz.org/x')

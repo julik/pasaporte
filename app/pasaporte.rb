@@ -271,9 +271,7 @@ module Pasaporte
       %w(openid_server openid_delegate).map do | c |
         validates_presence_of c, :if => any_url_present
       end
-  
-      attr_writer :delegates_openid # dummy for forms
-  
+      
       # Convert the profile to sreg according to the spec (YYYY-MM-DD for dob and such)
       def to_sreg_fields(fields_to_extract = nil)
         fields_to_extract ||= %w( nickname email fullname dob gender postcode country language timezone )
@@ -282,7 +280,7 @@ module Pasaporte
           v.blank? ? out : (out[field.to_s] = v.to_s; out)
         end
       end
-  
+      
       # We have to override that because we want our protected attributes
       def self.find_or_create_by_nickname_and_domain_name(nick, domain)
         returning(super(nick, domain)) do | me |
@@ -299,11 +297,15 @@ module Pasaporte
         s = [nickname, secret_salt, Time.now.year, Time.now.month].join('|')
         OpenSSL::Digest::SHA1.new(s).hexdigest.to_s
       end
-  
+      
       # Check if this profile wants us to delegate his openid to a different identity provider.
       # If both delegate and server are filled in properly this will return true
       def delegates_openid?
         ALLOW_DELEGATION && (!openid_server.blank? && !openid_delegate.blank?)
+      end
+      
+      def delegates_openid=(nv)
+        (self.openid_server, self.openid_delegate = nil, nil) if [false, '0', 0, 'no'].include?(nv) 
       end
       alias_method :delegates_openid, :delegates_openid? # for checkboxes
       
@@ -318,17 +320,15 @@ module Pasaporte
         
         %w(openid_server openid_delegate).map do | attr |
           return if self[attr].blank?
-          
           begin
-            flattened = OpenID::URINorm.urinorm(self[attr])
-            self[attr] = (flattened || (errors.add(attr, 'Only HTTP protocol addresses can be used'); self[attr]))
-          rescue URI::InvalidURIError => e
-            errors.add(attr, "Please provide a scheme (like http:// or https://)")
+            self[attr] = OpenID::URINorm.urinorm(self[attr])
+          rescue Exception => e
+            errors.add(attr, e.message)
           end
         end
       end
     end
-   
+    
     # A token that the user has approved a site (a site's trust root) as legal
     # recipient of his information
     class Approval < Base
@@ -641,7 +641,7 @@ module Pasaporte
           @state.failed_logins = 0
           
           # If we have a suspended OpenID procedure going on - continue
-          redirect R((@state.pending_openid ? Openid : ProfileEditor), @nickname); return
+          redirect R((@state.pending_openid ? Openid : ApprovalsPage), @nickname); return
         else
           @msg = "Oops.. cannot find you there"
           # Raise the grace counter
@@ -831,28 +831,26 @@ module Pasaporte
       @server
     end
     
-    # FIXME - this is not compatible with OpenID lib 2
-    # Add sreg details from Mai Profail to the response
+    # Add sreg details from the profile to the response
     def add_sreg(request, response)
-      # The user should be able to approve the transfer
-      # and modify each field if she likes.
       when_sreg_is_required(request) do | fields, policy_url |
-        response.add_fields('sreg', @profile.to_sreg_fields(fields))
+        addition = OpenID::SReg::Response.new(@profile.to_sreg_fields(fields))
+        response.add_extension(addition)
       end
     end
 
-    # FIXME - this is not compatible with OpenID lib 2
+    # Runs the block if the passed request contains an SReg requirement. Yields 
+    # an array of fields and the policy URL
     def when_sreg_is_required(openid_request)
       fetch_request = OpenID::SReg::Request.from_openid_request(openid_request)
       return unless fetch_request
       
-      required = openid_request.query['openid.sreg.required']
-      optional = openid_request.query['openid.sreg.optional']
-      policy_url = openid_request.query['openid.sreg.policy_url']
+      fieldnames = fetch_request.all_requested_fields
+      policy_url = fetch_request.policy_url
       
       something_needed = fetch_request.were_fields_requested?
       if block_given? && something_needed
-        yield(required.split(',') + optional.split(','), policy_url)
+        yield(fieldnames, policy_url)
       else
         something_needed
       end
@@ -940,8 +938,8 @@ module Pasaporte
           unless @no_toolbar
             div.toolbar! do
               if is_logged_in?
+                b.profBtn! "Logged in as #{@nickname.capitalize}" 
                 a.loginBtn! "Log out", :href => R(Signout, @nickname)
-                b.profBtn! @nickname.capitalize
               else
                 b.loginBtn! "You are not logged in"
               end
@@ -993,10 +991,9 @@ module Pasaporte
     def decide
       h2{ "Please approve <b>#{_h(@oid_request.trust_root)}</b>" }
       p  "You never logged into that site with us. Do you want us to approve?"
-
+      
       when_sreg_is_required(@oid_request) do | asked_fields, policy |
-        fields = asked_fields.to_sentence
-        p{"Additionally, the site wants to know your <b>#{fields}.</b> These will be sent along."}
+        p{ "Additionally, the site wants to know your <b>#{asked_fields.to_sentence}.</b> These will be sent along."}
         if policy
           p do 
             self << "That site has a "
@@ -1005,7 +1002,7 @@ module Pasaporte
           end
         end
       end
-
+      
       form :method => :post do
         input :name => :pleasedo, :type => :submit, :value => " Yes, do allow "
         self << '&#160;'
