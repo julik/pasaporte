@@ -5,8 +5,7 @@ Camping.goes :Pasaporte
 
 require 'openid'
 require 'openid/extensions/sreg'
-
-# TODO - this does not work with current lib ### require 'faster_openid'
+require 'faster_openid'
 require 'julik_state'
 
 module Pasaporte
@@ -352,21 +351,23 @@ module Pasaporte
   module Controllers
     
     # Wraps the "get" and "post" with nickname passed in the path. When
-    # get_with_nick is called, @nickname is already there.
+    # get_with_nick or post_with_nick is called, @nickname is already there.
     module Nicknames
       def get(*extras)
-        LOGGER.info "Got get on #{self.class}"
+        LOGGER.debug "Got get on #{self.class}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to get_with_nick" unless respond_to?(:get_with_nick)
         get_with_nick(*extras)
       end
       
       def post(*extras)
-        LOGGER.info "Got post on #{self.class}: #{@input.inspect}"
+        LOGGER.debug "Got post on #{self.class}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to post_with_nick" unless respond_to?(:post_with_nick)
         post_with_nick(*extras)
       end
+      
+      # So that we can define put_with_nick and Camping sees it as #put being available
       def respond_to?(m, *whatever)
         super(m.to_sym) || super("#{m}_with_nick".to_sym)
       end
@@ -522,15 +523,13 @@ module Pasaporte
       def get_with_nick
         @headers["Content-type"] = "application/xrds+xml"
         @skip_layout = true
-        renderd =  YADIS_TPL % get_endpoints
-        return renderd
+        YADIS_TPL % get_endpoints
       end
       
       private
         def get_endpoints
           defaults = [_our_endpoint_uri, _our_endpoint_uri]
           @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
-          
           return defaults unless @profile && @profile.delegates_openid?
           [@profile.openid_server, @profile.openid_delegate]
         end
@@ -608,13 +607,9 @@ module Pasaporte
           @state.nickname = @nickname
           @profile = profile_by_nickname(@nickname)
           
-          LOGGER.info "In state: #{@state.keys.inspect}"
-          
           # Recet the grace counter
           @state.failed_logins = 0
           
-          # Enforce a cookie - removed
-
           # If we have a suspended OpenID procedure going on - continue
           redirect R((@state.pending_openid ? Openid : ProfileEditor), @nickname); return
         else

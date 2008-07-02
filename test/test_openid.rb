@@ -228,7 +228,7 @@ class TestOpenid < Pasaporte::WebTest
     assert_kind_of OpenID::Consumer::SetupNeededResponse, openid_resp, "Setup is needed for this action"
     assert_not_nil qs["openid.user_setup_url"], "The setup URL should be passed"
     
-    setup_path, setup_qs = redirect_path_and_params(qs["openid.user_setup_url"])
+    setup_url, setup_path, setup_qs = redirect_url_path_and_params(qs["openid.user_setup_url"])
     assert_equal "/pasaporte/monsieur-hulot/decide", setup_path, 
       "The setup path is /decide because Hulot never logged in with Tativille before"
     
