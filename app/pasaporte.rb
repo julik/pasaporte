@@ -12,6 +12,7 @@ module Pasaporte
   MAX_FAILED_LOGIN_ATTEMPTS = 3
   THROTTLE_FOR = 2.minutes
   DEFAULT_COUNTRY = 'nl'
+  DEFAULT_TZ = 'Europe/Amsterdam'
   ALLOW_DELEGATION = true
   VERSION = '0.0.1'
   SESSION_LIFETIME = 10.hours
@@ -226,6 +227,32 @@ module Pasaporte
         drop_table :pasaporte_approvals
       end
     end
+    
+    class MigrateOpenidTables < V(1.2)
+      def self.up
+        drop_table :pasaporte_settings
+        drop_table :pasaporte_nonces
+        create_table :pasaporte_nonces, :force => true do |t|
+          t.column :server_url, :string, :null => false
+          t.column :timestamp, :integer, :null => false
+          t.column :salt, :string, :null => false
+        end
+      end
+      
+      def self.down
+        drop_table :pasaporte_nonces
+        create_table :pasaporte_nonces, :force => true do |t|
+          t.column "nonce", :string
+          t.column "created", :integer
+        end
+        
+        create_table :pasaporte_settings, :force => true do |t|
+          t.column "setting", :string
+          t.column "value", :binary
+        end
+      end
+    end
+    
   
     # Minimal info we store about people. It's the container for the sreg data
     # in the first place.
@@ -288,11 +315,16 @@ module Pasaporte
           errors.add(:delegate_server, "If you use delegation you have to specify both addresses")
           false
         end
-  
+        
         %w(openid_server openid_delegate).map do | attr |
           return if self[attr].blank?
-          flattened = OpenID::URINorm.urinorm(self[attr])
-          self[attr] = (flattened || (errors.add(attr, 'Only HTTP protocol addresses can be used'); self[attr]))
+          
+          begin
+            flattened = OpenID::URINorm.urinorm(self[attr])
+            self[attr] = (flattened || (errors.add(attr, 'Only HTTP protocol addresses can be used'); self[attr]))
+          rescue URI::InvalidURIError => e
+            errors.add(attr, "Please provide a scheme (like http:// or https://)")
+          end
         end
       end
     end
@@ -354,14 +386,12 @@ module Pasaporte
     # get_with_nick or post_with_nick is called, @nickname is already there.
     module Nicknames
       def get(*extras)
-        LOGGER.debug "Got get on #{self.class}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to get_with_nick" unless respond_to?(:get_with_nick)
         get_with_nick(*extras)
       end
       
       def post(*extras)
-        LOGGER.debug "Got post on #{self.class}"
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to post_with_nick" unless respond_to?(:post_with_nick)
         post_with_nick(*extras)
@@ -633,7 +663,7 @@ module Pasaporte
         Throttle.set!(env)
   
         @state.failed_logins = 0
-        LOGGER.info "#{env['REMOTE_ADDR']} - Throttling #{@nickname}"
+        LOGGER.info "#{env['REMOTE_ADDR']} - Throttling #{@nickname} for #{THROTTLE_FOR} seconds"
   
         # If we still have an OpenID request hanging about we need
         # to let the remote party know that there is nothing left to hope for
@@ -648,8 +678,8 @@ module Pasaporte
           end
           # Reset the state so that the session is regenerated. Something wrong is
           # going on so we better be sure
-          @oid_request = @state.delete(:pending_openid)
-          #@state = {}
+          @oid_request, @state = @state.delete(:pending_openid), Camping::H.new
+          
           # And send the flowers away
           bugger_off = @oid_request.answer(false)
           return send_openid_response(bugger_off)
@@ -962,7 +992,7 @@ module Pasaporte
     # Let the user decide what data he wants to transfer
     def decide
       h2{ "Please approve <b>#{_h(@oid_request.trust_root)}</b>" }
-      p  "You never logged into that site with us. Do you want us to approve? "
+      p  "You never logged into that site with us. Do you want us to approve?"
 
       when_sreg_is_required(@oid_request) do | asked_fields, policy |
         fields = asked_fields.to_sentence

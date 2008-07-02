@@ -287,16 +287,14 @@ class TestOpenid < Pasaporte::WebTest
   end
   
   def test_in_which_tativille_uses_dumb_mode
-    # prelogin!; preapprove!
-    # dumb = OpenID::DumbStore.new("les-vacances")
-    # @consumer = OpenID::Consumer.new(@openid_session, dumb)
-    # 
-    # req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
-    # assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
-    # path, qs = redirect_path_and_params
-    # assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
-    # assert_kind_of OpenID::SuccessResponse, @consumer.complete(qs), "The response is positive"
-    flunk
+    prelogin!; preapprove!
+    @consumer = OpenID::Consumer.new(@openid_session, nil)
+    
+    req = @consumer.begin("http://test.host/pasaporte/monsieur-hulot")
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    redir, path, qs = redirect_url_path_and_params
+    assert_equal '/wiki/signup', path, "This should be the path to the wiki signup"
+    assert_kind_of OpenID::Consumer::SuccessResponse, @consumer.complete(qs, redir), "The response is positive"
   end
   
   private
