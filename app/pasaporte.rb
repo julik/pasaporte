@@ -33,8 +33,6 @@ module Pasaporte
   COUNTRIES = YAML::load(File.read(File.dirname(PATH) + '/pasaporte/iso_countries.yml')) #:nodoc:
   TIMEZONES = YAML::load(File.read(File.dirname(PATH) + '/pasaporte/timezones.yml')).sort{|e1, e2| e1[1] <=> e2[1]} #:nodoc:
   
-  DOCTYPE = %[<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">] #:nodoc:
-    
   # Reads and applies pasaporte/config.yml to the constants
   def self.apply_config!
      silence_warnings do
@@ -117,15 +115,6 @@ module Pasaporte
         return self
       end
       self
-    end
-  end
-
-  # Adds a DOCTYPE to all outgoing HTML - a Camping bug.
-  module Proper #:nodoc:
-    def service(*a)
-      returning(super(*a)) do | r |
-        r.body = (DOCTYPE + "\n" + r.body) if (r.headers["Content-type"] == "text/html")
-      end
     end
   end
 
