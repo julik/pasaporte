@@ -120,11 +120,16 @@ form#signon label * {
 
 div#msg {
   margin: 1.1em 0 0.5em 0;
-  padding: 7px;
-  padding-top: 9px;
-  color: white;
+  padding: 5px 4px 4px 16px;
+  color: rgb(20,20,20);
+  font-size: small;
+  background: rgb(167, 207, 137);
+}
+
+div#msg.e {
   background: rgb(250, 154, 132);
 }
+
 form { margin-bottom: .4em; }
 p { margin: .2em 0 .6em 0; }
 textarea { letter-spacing: .04em; margin-top: 1em; width: 100%;  border-width: 1px;}

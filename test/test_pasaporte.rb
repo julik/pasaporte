@@ -106,7 +106,7 @@ class TestSignon < Pasaporte::WebTest
     post '/julik/signon', :pass => 'junkman'
     
     assert_response :redirect
-    assert_redirected_to '/julik/edit'
+    assert_redirected_to '/julik/prefs'
     
     assert_not_nil @assigns.profile, "The profile should have been hooked up"
     assert_equal 2, @assigns.profile.id, "This is Julik's profile"
@@ -169,7 +169,8 @@ class TestApprovalsPage < Pasaporte::WebTest
     Profile.find_by_nickname('julik').approvals.destroy_all
     prelogin 'julik'
     get '/julik/approvals'
-    assert_no_match_body /The sites you trust/
+    assert_redirected_to '/julik/prefs'
+    assert_not_nil @state.msg
   end
 end
 
@@ -237,12 +238,12 @@ class TestProfileEditor < Pasaporte::WebTest
     assert_nil prof.openid_server, "Nothing should have been assigned"
   end
   
-  test 'should show success message when changing the profile succeeds' do
+  test 'should redirect with success message when changing the profile succeeds' do
     prelogin 'julik'
     post '/julik/edit', :profile => {:email => 'trof@groff.com'}
-    assert_response :success
-    assert_not_nil @assigns.msg
-    assert_match /Changed/i, @assigns.msg
+    assert_response :redirect
+    assert_not_nil @state.msg
+    assert_match /Changed/i, @state.msg
   end
   
   test 'default country should be selected when loading the profile page for the first time' do
@@ -290,6 +291,7 @@ end
 # end
 
 class TestPublicSignon < Pasaporte::WebTest
+  fixtures :pasaporte_profiles
   test 'should present a login screen without predefined nickname' do
     get
     assert_response :success
@@ -300,15 +302,16 @@ class TestPublicSignon < Pasaporte::WebTest
     post '/', :login => 'schtwo', :pass => 'foo'
     assert_response :success
     assert_nil @state.nickname
-    assert @response.body.include?('Your name:<b>schtwo</b>'),
-      "The response should include text now instead of a login field"
+    assert_select 'input[type="hidden"]', true
+      "The response should include a hidden field now instead of a text field"
   end
   
-  test 'should redirect to edit page after a succesful login' do
-    flexmock(Pasaporte::AUTH).should_receive(:call).with("somebdy", "pfew", "test.host").and_return(true)
-    post '/', :login => "somebdy", :pass => "pfew"
+  test 'should redirect to profile page for new users' do
+    flexmock(Pasaporte::AUTH).should_receive(:call).with("unknown", "pfew", "test.host").and_return(true)
+    post '/', :login => "unknown", :pass => "pfew"
     assert_response :redirect
-    assert_redirected_to '/somebdy/edit'
+    assert_not_nil Profile.find_by_nickname('unknown'), "A profile should have been created during login"
+    assert_redirected_to '/unknown/prefs'
   end
   
 end

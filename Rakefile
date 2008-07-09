@@ -1,3 +1,4 @@
+$:.reject! { |e| e.include? 'TextMate' }
 require 'rubygems'
 require 'active_support'
 require 'hoe'

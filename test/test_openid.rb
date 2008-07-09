@@ -1,3 +1,4 @@
+$:.reject! { |e| e.include? 'TextMate' }
 require File.dirname(__FILE__) + '/helper'
 require 'fileutils'
 require File.dirname(__FILE__) + '/testable_openid_fetcher'
@@ -21,6 +22,7 @@ class TestOpenid < Pasaporte::WebTest
     @fetcher = TestableOpenidFetcher.new(self)
     
     OpenID.fetcher = @fetcher
+    OpenID::Util.logger = Pasaporte::LOGGER
     
     @store = OpenID::Store::Memory.new
     @openid_session = {}

@@ -20,7 +20,7 @@ end
 
 Test::Unit::TestCase.fixture_path = File.dirname(__FILE__) + "/fixtures/"
 ActiveRecord::Base.logger = Logger.new("/dev/null") # SAILENS!
-Pasaporte::LOGGER.level = Logger::INFO
+Pasaporte::LOGGER.level = Logger::ERROR
 
 def mock_auth(log, pass, dom)
   logins = %w(monsieur-hulot julian jamesbrown)

@@ -8,6 +8,9 @@ require 'openid/extensions/sreg'
 require 'faster_openid'
 require 'julik_state'
 
+# Markaby::Builder.set(:indent, 2)
+Markaby::Builder.set(:output_xml_instruction, false)
+
 module Pasaporte
   MAX_FAILED_LOGIN_ATTEMPTS = 3
   THROTTLE_FOR = 2.minutes
@@ -50,13 +53,31 @@ module Pasaporte
 
   # Adds a magicvar that gets cleansed akin to Rails Flash
   module CampingFlash
-    def service(*a)
-      expire= (@state && @state.msg)
-      returning(super(*a)) do
-        # Expire the message if it was there before the action
-        @state.delete('msg') if (@state && expire)
-      end
+    
+    def show_error(message)
+      @err = message
     end
+    
+    def show_message(message)
+      @msg = message
+    end
+    
+    def service(*a)
+      @msg, @err = [:msg, :err].map{|e| @state.delete(e) }, 
+      super(*a)
+    end
+    
+    def redirect(*argz)
+      @state.msg, @state.err =  @msg, @err
+      super(*argz)
+    end
+  end
+  
+  module LoggerHijack
+    #def service(*the_rest)
+    #  _hijacked, OpenID::Util.logger = OpenID::Util.logger, LOGGER
+    #  returning(super(*the_rest)) { OpenID::Util.logger = _hijacked }
+    #end
   end
   
   # Or a semblance thereof
@@ -121,7 +142,7 @@ module Pasaporte
   # The order here is important. Camping::Session has to come LAST (innermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, Secure, JulikState].map{|m| include m }
+  [CampingFlash, Secure, JulikState, LoggerHijack].map{|m| include m }
 
   module Models
     MAX = :limit # Thank you rails core, it was MAX before
@@ -242,6 +263,17 @@ module Pasaporte
       end
     end
     
+    class ShardOpenidTables < V(1.3)
+      def self.up
+        add_column :pasaporte_associations, :pasaporte_domain, :string, :null => false, :default => 'localhost'
+        add_column :pasaporte_nonces, :pasaporte_domain, :string, :null => false, :default => 'localhost'
+      end
+      
+      def self.down
+        remove_column :pasaporte_nonces, :pasaporte_domain
+        remove_column :pasaporte_associations, :pasaporte_domain
+      end
+    end
   
     # Minimal info we store about people. It's the container for the sreg data
     # in the first place.
@@ -394,12 +426,12 @@ module Pasaporte
     
     # Make a controller for a specfic user
     def self.personal(uri = nil)
-      returning(R(["/([^\/]+)", uri].compact.map{|e| e.to_s}.join("/"))) do | ak |
+      returning(R(['/([0-9A-Za-z\-\_]+)', uri].compact.join("/"))) do | ak |
         ak.send(:include, Secure::CheckMethods)
         ak.send(:include, Nicknames)
       end
     end
-  
+    
     # Performs the actual OpenID tasks. POST is for the
     # requesting party, GET is for the browser
     class Openid < personal(:openid)
@@ -558,50 +590,37 @@ module Pasaporte
       def get_with_nick
         require_login
         @approvals = @profile.approvals
+        (@msg = 'You currently do not have any associations with other sites through us'; return redirect(DashPage, @nickname)) if @approvals.empty?
         render :approvals_page
       end
     end
-
-    class DeleteApproval < personal("disapprove/(\d+)")
-      def get_with_nick(id)
-        @nickname = nick
+    
+    class DeleteApproval < personal('disapprove/(\d+)')
+      def get_with_nick(appr_id)
         require_login
-        @profile.approvals.destroy(id)
+        ap = @profile.approvals.find(appr_id); ap.destroy
+        show_message "The site #{ap} has been removed from your approvals list"
         redirect R(ApprovalsPage, @nickname)
       end
       alias_method :post_with_nick, :get_with_nick
     end
     
-    # Shows a signon page that allows to enter the login
-    class PublicSignon < R('/')
-      def get
-        render :signon_form
-      end
-      
-      def post
-        # encode the input and forward it to the private login page
-        y = Pasaporte.post(:Signon, input.login, {"env"=>env, "input" => input})
-        if y.status == 302
-          @status, @headers['Location'] = 302, y.headers['Location']; return
-        end
-        # r does not work quite well for redirects (well it kinda does but not always)
-        r(y.status, y.body, y.headers)
-      end
-    end
-    
     # Show the login form and accept the input
-    class Signon < personal(:signon)
+    class Signon < R('/', "/([^\/]+)/signon")
+      include Secure::CheckMethods
       
-      def get_with_nick
+      def get(nick=nil)
         deny_throttled!
-        if @state.pending_openid
+        return redirect(DashPage, @state.nickname) if @state.nickname 
+        if nick && @state.pending_openid
           humane = URI.parse(@state.pending_openid.trust_root).host
-          @msg = "Before authorizing with <b>#{humane}</b> you will need to login"
+          show_message "Before authorizing with <b>#{humane}</b> you will need to login"
         end
+        @nickname = nick;
         render :signon_form
       end
       
-      def post_with_nick
+      def post(n=nil)
         begin
           deny_throttled!
         rescue Pasaporte::Secure::Throttled => th
@@ -611,7 +630,7 @@ module Pasaporte
           end
           raise th
         end
-        
+        @nickname = @input.login || n || (raise "No nickname to authenticate")
         # The throttling logic must be moved into throttles apparently
         # Start counting
         @state.failed_logins ||= 0
@@ -620,7 +639,7 @@ module Pasaporte
         # tell the OpenID requesting party to go away
         if Pasaporte::AUTH.call(@nickname, input.pass, my_domain)
           LOGGER.info "#{@nickname} logged in, setting state"
-          # Special case - if the login ultimately differs from the one entered
+          # TODO - Special case - if the login ultimately differs from the one entered
           # we need to take care of that and tell the OID consumer that we want to restart
           # from a different profile URL
           @state.nickname = @nickname
@@ -630,9 +649,9 @@ module Pasaporte
           @state.failed_logins = 0
           
           # If we have a suspended OpenID procedure going on - continue
-          redirect R((@state.pending_openid ? Openid : ApprovalsPage), @nickname); return
+          redirect R((@state.pending_openid ? Openid : DashPage), @nickname); return
         else
-          @msg = "Oops.. cannot find you there"
+          show_error "Oops.. cannot find you there"
           # Raise the grace counter
           @state.failed_logins += 1
           if @state.failed_logins >= MAX_FAILED_LOGIN_ATTEMPTS
@@ -645,15 +664,16 @@ module Pasaporte
           end
         end
       end
+      
       private
       def punish_the_violator
         @report = "I am stopping you from sending logins for some time so that you can " +
         "lookup (or remember) your password. See you later."
         Throttle.set!(env)
-  
+        
         @state.failed_logins = 0
         LOGGER.info "#{env['REMOTE_ADDR']} - Throttling #{@nickname} for #{THROTTLE_FOR} seconds"
-  
+        
         # If we still have an OpenID request hanging about we need
         # to let the remote party know that there is nothing left to hope for
         if @state.pending_openid
@@ -714,7 +734,7 @@ module Pasaporte
     end
     
     # Allows the user to modify the settings
-    class ProfileEditor < personal(:edit)
+    class EditProfile < personal(:edit)
       def get_with_nick
         require_login
         render :profile_form
@@ -725,11 +745,10 @@ module Pasaporte
         _collapse_checkbox_input(input)
         
         if @profile.update_attributes(input.profile)
-          @msg = "Your settings have been changed"
-        else
-          @err = "Cannot save your profile: <b>%s</b>" % @profile.errors.full_messages
+          show_message "Your settings have been changed"
+          redirect R(DashPage, @nickname); return
         end
-        
+        show_error "Cannot save your profile: <b>%s</b>" % @profile.errors.full_messages
         render :profile_form
       end
     end
@@ -792,10 +811,14 @@ module Pasaporte
         render(@profile && @profile.shared? ? :profile_public_page : :endpoint_splash)
       end
     end
+    
+    class DashPage < personal(:prefs)
+      def get_with_nick; require_login; render :dash; end
+    end
   end
-
-  module Helpers
   
+  module Helpers
+    
     def is_logged_in?
       (@state.nickname && (@state.nickname == @nickname))
     end
@@ -815,6 +838,10 @@ module Pasaporte
   
     def openid_server
       @store ||= PasaporteStore.new
+      
+      # Associations etc are sharded per domain on which Pasaporte sits
+      @store.pasaporte_domain = @env['SERVER_NAME']
+      
       # we also need to provide endopint URL - this is where Pasaporte is mounted
       @server ||= OpenID::Server::Server.new(@store, @env['SERVER_NAME'])
       @server
@@ -877,7 +904,17 @@ module Pasaporte
       h2 "Sorry but it's true"
       self << p(@report)
     end
-
+    
+    # Render the dash
+    def dash
+      h2 { "Welcome <b>#{@nickname}</b>, nice to have you back" }
+      p { "Your OpenID is <b>#{_our_identity_url}</b>" }
+      ul.bigz! do
+        li.profButn! { a "Change your profile", :href => R(EditProfile, @nickname) }
+        li.apprButn! { a "See the sites that logged you in", :href => R(ApprovalsPage, @nickname) }
+      end
+    end
+    
     # Render the public profile page
     def profile_public_page
       h2 do
@@ -887,12 +924,11 @@ module Pasaporte
     end
 
     def signon_form
-      
       form.signon! :method => :post do
         label :for => 'login' do
           self << "Your name:"
           # We include a hidden input here but it's only ever used by PublicSignon
-          if @nickname
+          if @nickname && @state.pending_openid
             b(@nickname)
             input(:name => "login", :value => @nickname, :type => :hidden)
           else
@@ -937,7 +973,7 @@ module Pasaporte
           end
           
           div.work! :class => (is_logged_in? ? "logdin" : "notAuth") do
-            returning(@err || @msg || @state.msg) {| m | div.msg!{m} if m } 
+            returning(@err || @msg) {| m | div.msg!(:class =>(@err ? 'e' : 'm')){m} if m } 
             self << yield
           end
         end
@@ -979,7 +1015,7 @@ module Pasaporte
     # Let the user decide what data he wants to transfer
     def decide
       h2{ "Please approve <b>#{_h(@oid_request.trust_root)}</b>" }
-      p  "You never logged into that site with us. Do you want us to approve?"
+      p  "You never logged into that site with us. Do you want us to confirm that you do have an account here?"
       
       when_sreg_is_required(@oid_request) do | asked_fields, policy |
         p{ "Additionally, the site wants to know your <b>#{asked_fields.to_sentence}.</b> These will be sent along."}
@@ -1004,20 +1040,18 @@ module Pasaporte
       # log me out button
     end
 
+    def _approval_block(appr)
+      h4 appr
+      a "Remove this site", :href => R(DeleteApproval, @nickname, appr)
+    end
+    
     def approvals_page
-      h2 { "Hello " + b(@profile) }
-      p do
-        self << "You are now logged in. Pass the following address to any OpenID-enabled site that you want to visit"
-        br
-        b _our_identity_url
-      end
+      h2 "The sites you trust"
       if @approvals.any?
-        h2 "The sites you trust"
-        p { small "These sites will be able to automatically log you in without first asking you to approve"}
-        ul do
-          @approvals.map do | approval |
-            li { approval }
-          end
+        p { "These sites will be able to automatically log you in without first asking you to approve" }
+        p { "Removing a site from the list will force that site to ask your permission next time when checking your OpenID" }
+        ul.apprList! do
+          @approvals.map { | ap | li { _approval_block(ap) } }
         end
       else
         p "You did not yet authorize any sites to use your OpenID"
