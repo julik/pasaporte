@@ -3,6 +3,9 @@ $: << File.dirname(__FILE__) + '/pasaporte'
 
 Camping.goes :Pasaporte
 
+# Versions before that have bugs unfortunately.
+gem 'ruby-openid', '>=2.1.0'
+
 require 'openid'
 require 'openid/extensions/sreg'
 require 'faster_openid'
@@ -139,11 +142,13 @@ module Pasaporte
     end
   end
 
+  require '/Code/tools/ruby_libs/phixated/lib/camping_service'
+
   # The order here is important. Camping::Session has to come LAST (innermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, Secure, JulikState, LoggerHijack].map{|m| include m }
-
+  [CampingFlash, Secure, Phixated::CampingService, LoggerHijack].map{|m| include m }
+  
   module Models
     MAX = :limit # Thank you rails core, it was MAX before
     class CreatePasaporte < V 1.0
@@ -860,15 +865,10 @@ module Pasaporte
     def when_sreg_is_required(openid_request)
       fetch_request = OpenID::SReg::Request.from_openid_request(openid_request)
       return unless fetch_request
-      
-      fieldnames = fetch_request.all_requested_fields
-      policy_url = fetch_request.policy_url
-      
-      something_needed = fetch_request.were_fields_requested?
-      if block_given? && something_needed
-        yield(fieldnames, policy_url)
+      if block_given? && fetch_request.were_fields_requested?
+        yield(fetch_request.all_requested_fields, fetch_request.policy_url)
       else
-        something_needed
+        false
       end
     end
   
@@ -997,13 +997,13 @@ module Pasaporte
 
     # Canonicalized URL of our endpoint    
     def _our_endpoint_uri
-      uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
+      uri = "#{@env.HTTPS.to_s.downcase == 'on' ? 'https' : 'http'}://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
       OpenID::URINorm.urinorm(uri)
       uri
     end
     
     def _our_identity_url
-      uri = "http://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(ProfilePage, @nickname)].join('/').squeeze('/')
+      uri = "#{@env.HTTPS.to_s.downcase == 'on' ? 'https' : 'http'}://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(ProfilePage, @nickname)].join('/').squeeze('/')
       OpenID::URINorm.urinorm(uri)
     end
 
@@ -1181,7 +1181,9 @@ module Pasaporte
   end
 
   def self.create
-    JulikState.create_schema
+    #JulikState.create_schema
+    Phixated::ARSession.create_schema
+    
     self::Models.create_schema
   end
 end
