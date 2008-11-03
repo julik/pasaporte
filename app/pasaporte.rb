@@ -144,9 +144,9 @@ module Pasaporte
     end
   end
   
+  # Camping bug workaround - on redirect the cookie header is not set
   module CookiePreservingRedirect
     def redirect(*args)
-      puts "CPR"
       @headers['Set-Cookie'] = @cookies.map { |k,v| "#{k}=#{C.escape(v)}; path=#{self/"/"}" if v != @k[k] } - [nil]
       super(*args)
     end

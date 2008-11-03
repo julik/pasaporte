@@ -1,4 +1,4 @@
-==Onde está seu pasaporte?
+= Onde está seu pasaporte?
 
 This is Pasaporte, a small identity server with a colored bar on top. It's in the style
 of Crowd (but smaller). Will act as a mediator between OpenID and arbitary services where

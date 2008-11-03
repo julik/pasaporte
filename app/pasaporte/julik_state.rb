@@ -21,20 +21,14 @@ module JulikState
   def _sid; (0...32).inject("") { |ret,_| ret << RC[rand(RC.length)] }; end
   def _appn; self.class.to_s.split(/::/).shift; end
   
-  # Generate a HMAC signature based on the session key and a few key HTTP request
-  # headers
-  def _generate_digest(key, header_hash)
-    fingerprint = [key, header_hash['HTTP_USER_AGENT'], header_hash['REMOTE_IP'] || header_hash['REMOTE_ADDR']]
-    enc = Base64.encode64(Marshal.dump(fingerprint))
-    digest_type = 'SHA1'
-    OpenSSL::HMAC.hexdigest(OpenSSL::Digest::Digest.new(digest_type), secret, enc)
-  end
-  
   def force_session_save!
-    @js_rec.update_attributes :blob => @state
+    @cookies.jsid ||= _sid
+    res = @js_rec.update_attributes :blob => @state, :sid => @cookies.jsid
+    raise "Cannot save session" unless res
   end
   
   def service(*a)
+    
     fresh = Camping::H[{}]
     @js_rec = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(:app => _appn, :blob => fresh,
       :sid => (@cookies.jsid ||= _sid))

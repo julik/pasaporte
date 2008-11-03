@@ -17,7 +17,7 @@ Hoe.new('Pasaporte', Pasaporte::VERSION) do |p|
   p.summary = "Downgrades the OpenID providing business to the usual login-password stupidity."
   p.url = "http://julik.nl/projects/pasaporte"
   p.rdoc_pattern = /README.txt|CHANGELOG.txt|app/
-  p.clean_globs = ['test/openid-consumer-store', '**.log', 'coverage', 'coverage.data']
+  p.clean_globs = ['**.log', 'coverage', 'coverage.data']
   p.extra_deps = ['activerecord', 'camping', 'ruby-openid', 'flexmock']
 end
 
