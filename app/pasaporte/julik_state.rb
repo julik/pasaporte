@@ -30,14 +30,19 @@ module JulikState
     OpenSSL::HMAC.hexdigest(OpenSSL::Digest::Digest.new(digest_type), secret, enc)
   end
   
+  def force_session_save!
+    @js_rec.update_attributes :blob => @state
+  end
+  
   def service(*a)
     fresh = Camping::H[{}]
-    s = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(:app => _appn, :blob => fresh,
+    @js_rec = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(:app => _appn, :blob => fresh,
       :sid => (@cookies.jsid ||= _sid))
-    @state = s.blob.dup
+    
+    @state = @js_rec.blob.dup
     @msg = @state.delete(:msg)
     returning(super(*a)) do
-      s.update_attributes :blob => @state if (@state != s.blob)
+      force_session_save! if (@state != @js_rec.blob)
     end
   end
 end
