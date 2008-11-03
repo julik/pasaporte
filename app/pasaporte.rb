@@ -132,6 +132,7 @@ module Pasaporte
       rescue FullStop
         return self
       rescue PleaseLogin
+        LOGGER.info "#{env['REMOTE_ADDR']} - Redirecting to signon #{@cookies.inspect}"
         redirect R(Pasaporte::Controllers::Signon, @nickname)
         return self
       rescue Throttled
@@ -142,11 +143,20 @@ module Pasaporte
       self
     end
   end
-
+  
+  module CookiePreservingRedirect
+    def redirect(*args)
+      puts "CPR"
+      @headers['Set-Cookie'] = @cookies.map { |k,v| "#{k}=#{C.escape(v)}; path=#{self/"/"}" if v != @k[k] } - [nil]
+      super(*args)
+    end
+  end
+  
   # The order here is important. Camping::Session has to come LAST (innermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, Secure, JulikState, LoggerHijack].map{|m| include m }
+  [CampingFlash, CookiePreservingRedirect, Secure, JulikState, LoggerHijack].map{|m| include m }
+  
   
   module Models
     MAX = :limit # Thank you rails core, it was MAX before
@@ -447,7 +457,6 @@ module Pasaporte
       class NoOpenidRequest < RuntimeError; end  #:nodoc
       
       def get_with_nick
-        # Force a session save
         begin
           @oid_request = openid_request_from_input_or_session
           
@@ -619,6 +628,7 @@ module Pasaporte
       include Secure::CheckMethods
       
       def get(nick=nil)
+        LOGGER.info "Entered signon with #{@cookies.inspect}"
         deny_throttled!
         return redirect(DashPage, @state.nickname) if @state.nickname 
         if nick && @state.pending_openid
@@ -1193,5 +1203,7 @@ module Pasaporte
     self::Models.create_schema
     LOGGER.warn "Deleting stale sessions"
     JulikState::State.delete_all
+    LOGGER.warn "Deleting set throttles"
+    self::Models::Throttle.delete_all
   end
 end
