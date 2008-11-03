@@ -975,7 +975,7 @@ module Pasaporte
         head do
           link :rel => "openid.server", :href => _openid_server_uri 
           link :rel => "openid.delegate", :href => _openid_delegate_uri
-          meta 'http-equiv' => 'X-XRDS-Location', :content => (_our_identity_url + '/yadis')
+          # meta 'http-equiv' => 'X-XRDS-Location', :content => (_our_identity_url + '/yadis')
           link :rel => "stylesheet", :href => _s("pasaporte.css")
           script :type=>'text/javascript', :src => _s("pasaporte.js")
           title(@title || ('%s : pasaporte' % env['SERVER_NAME']))
