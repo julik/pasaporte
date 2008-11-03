@@ -19,10 +19,6 @@ Should the password become stale or should the authentication backend say that i
 longer has the user in question the authorization tokens are immediately revoked, and any
 authorization requests will be denied.
 
-As an example we provide a simple adapter with which you can easily shoehorn OpenID into
-Microsoft Remote Web Workplace server. And don't even dare to tell me about LDAP. LDAP is
-for sissies.
-
 ==Configuration
 
 The adventurous among us can override the defaults (Pasaporte constants) by placing a
@@ -33,12 +29,13 @@ a "hash-formatted YAML file" is, because if you do you are not adventurous.
 
 Considering the clear-text passwords issue, we strongly recommend running Pasaporte under
 SSL and under SSL only. But of course this might be prohibitive especially if you cannot
-be self-signed or don't have an extra IP at hand.
+be self-signed or don't have an extra IP at hand. When you run Pasaporte under HTTPS all
+URLs are going to be rewritten automatically to redirect and link to the HTTPS site.
 
 ==Profiles
 
 Pasaporte allows the user to have a simple passport page, where some info can be placed
-for people who follow the OpenID profile URL. Sharing the information si entirelly optional.
+for people who follow the OpenID profile URL. Sharing the information  is entirelly optional.
 
 ==The all-id
 
@@ -61,6 +58,12 @@ We store some data that the user might find useful to store and maybe display on
 page. No sites that the user authorizes are stored. No sessions of the exchange are kept
 except of the standard OpenID shared secrets (there are not linked to user records in any
 way).
+
+==SREG data sharing
+
+There is currently no provision for fetching SREG data (like email, date of birth and such)
+from the autorizing routine. We might consider this in the future, for now the user has to
+fill it in himself.
 
 ==Sharding
 
