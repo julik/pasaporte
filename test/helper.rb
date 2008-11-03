@@ -2,7 +2,7 @@ require 'rubygems'
 #gem 'activesupport', '<=2.0.2'
 $:.reject! { |e| e.include? 'TextMate' }
 
-require File.dirname(__FILE__) + '/../app/pasaporte'
+require File.dirname(__FILE__) + '/../lib/pasaporte'
 require File.dirname(__FILE__) + '/mosquito'
 
 require 'flexmock'

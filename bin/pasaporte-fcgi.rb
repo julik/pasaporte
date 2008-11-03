@@ -2,7 +2,7 @@
 require 'rubygems'
 require 'camping'
 require 'camping/fastcgi'
-require File.dirname(__FILE__) + '/../app/pasaporte'
+require File.dirname(__FILE__) + '/../lib/pasaporte'
 
 Camping::Models::Base.establish_connection(
         :adapter => 'sqlite3',

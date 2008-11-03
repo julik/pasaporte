@@ -1,16 +1,19 @@
-%w( rubygems logger camping camping/session ).map{|g| require g }
-$: << File.dirname(__FILE__)
-
-Camping.goes :Pasaporte
-
-# Versions before that have bugs unfortunately.
+require 'rubygems'
 gem 'ruby-openid', '>=2.1.0'
 
-require 'openid'
-require 'openid/extensions/sreg'
-require 'pasaporte/faster_openid'
-require 'pasaporte/julik_state'
-require 'pasaporte/markaby_ext'
+$: << File.dirname(__FILE__)
+
+%w(
+  camping
+  camping/session
+  openid
+  openid/extensions/sreg
+  pasaporte/faster_openid
+  pasaporte/julik_state
+  pasaporte/markaby_ext
+).each {|r| require r }
+
+Camping.goes :Pasaporte
 
 Markaby::Builder.set(:output_xml_instruction, false)
 
