@@ -582,7 +582,7 @@ module Pasaporte
           xmlns:openid="http://openid.net/xmlns/1.0">
         <XRD>
         <Service priority="1">
-          <Type>http://openid.net/signon/1.0</Type>
+          <Type>http://openid.net/signon/2.0</Type>
           <URI>%s</URI>
           <openid:Delegate>%s</openid:Delegate>
         </Service>
