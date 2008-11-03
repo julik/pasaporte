@@ -1,5 +1,5 @@
-%w( rubygems logger camping camping/session).map{|g| require g }
-$: << File.dirname(__FILE__) + '/pasaporte'
+%w( rubygems logger camping camping/session ).map{|g| require g }
+$: << File.dirname(__FILE__)
 
 Camping.goes :Pasaporte
 
@@ -8,8 +8,9 @@ gem 'ruby-openid', '>=2.1.0'
 
 require 'openid'
 require 'openid/extensions/sreg'
-require 'faster_openid'
-require 'julik_state'
+require 'pasaporte/faster_openid'
+require 'pasaporte/julik_state'
+require 'pasaporte/markaby_ext'
 
 # Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
@@ -142,12 +143,10 @@ module Pasaporte
     end
   end
 
-  require '/Code/tools/ruby_libs/phixated/lib/camping_service'
-
   # The order here is important. Camping::Session has to come LAST (innermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, Secure, Phixated::CampingService, LoggerHijack].map{|m| include m }
+  [CampingFlash, Secure, JulikState, LoggerHijack].map{|m| include m }
   
   module Models
     MAX = :limit # Thank you rails core, it was MAX before
@@ -449,7 +448,6 @@ module Pasaporte
       
       def get_with_nick
         # Force a session save
-        @state.touched = Time.now.to_i
         begin
           @oid_request = openid_request_from_input_or_session
           
@@ -480,7 +478,9 @@ module Pasaporte
         rescue PleaseLogin => e
           # There is a subtlety here. If the user had NO session before entering
           # this, he will get a new SID upon arriving at the signon page and thus
-          # will loose his openid request.
+          # will loose his openid request
+          force_session_save!
+          LOGGER.warn "pasaporte: suspend - the user needs to login first, saving session"
           @oid_request.immediate ? ask_user_to_approve : (raise e)
         rescue NeedsApproval
           LOGGER.warn "pasaporte: suspend - the URL needs approval first"
@@ -526,7 +526,7 @@ module Pasaporte
         end
   
         if (@state.nickname && (nick_from_uri != @state.nickname))
-          raise Denied, "The identity '#{@oid_request.identity_url}' is not the one of the current user"
+          raise Denied, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
         end
       end
   
@@ -595,7 +595,11 @@ module Pasaporte
       def get_with_nick
         require_login
         @approvals = @profile.approvals
-        (@msg = 'You currently do not have any associations with other sites through us'; return redirect(DashPage, @nickname)) if @approvals.empty?
+        if @approvals.empty?
+          @msg = 'You currently do not have any associations with other sites through us'
+          return redirect(DashPage, @nickname)
+        end
+        
         render :approvals_page
       end
     end
@@ -911,7 +915,9 @@ module Pasaporte
       p { "Your OpenID is <b>#{_our_identity_url}</b>" }
       ul.bigz! do
         li.profButn! { a "Change your profile", :href => R(EditProfile, @nickname) }
-        li.apprButn! { a "See the sites that logged you in", :href => R(ApprovalsPage, @nickname) }
+        if @profile.approvals.count > 0
+          li.apprButn! { a "See the sites that logged you in", :href => R(ApprovalsPage, @nickname) }
+        end
       end
     end
     
@@ -1022,7 +1028,7 @@ module Pasaporte
         if policy
           p do 
             self << "That site has a "
-            a("policy on it's handling of user data", :href => policy_url)
+            a("policy on it's handling of user data", :href => policy)
             self << " that you might want to read beforehand."
           end
         end
@@ -1131,8 +1137,10 @@ module Pasaporte
         end
 
         label.sel do
-          self << "Your date of birth" 
-          _todo
+          self << "Your date of birth"
+          span.inlineSelects do
+            self << date_select(:profile, :dob, :start_year => 1930, :end_year => (Date.today.year - 15))
+          end
         end
 
         label "The timezone you are in"
@@ -1181,9 +1189,9 @@ module Pasaporte
   end
 
   def self.create
-    #JulikState.create_schema
-    Phixated::ARSession.create_schema
-    
+    JulikState.create_schema
     self::Models.create_schema
+    LOGGER.warn "Deleting stale sessions"
+    JulikState::State.delete_all
   end
 end

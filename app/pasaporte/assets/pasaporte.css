@@ -133,6 +133,7 @@ div#msg.e {
 form { margin-bottom: .4em; }
 p { margin: .2em 0 .6em 0; }
 textarea { letter-spacing: .04em; margin-top: 1em; width: 100%;  border-width: 1px;}
+
 /* Here we have to be careful to keep Aqua widgets in Safari 3. The magic property is background. 
 http://particletree.com/notebook/design-friendly-select-elements-in-safari-3 */
 input, textarea, option { font-family: inherit; margin-top: 1px; font-size: inherit;}
@@ -160,6 +161,18 @@ input[type=submit] { padding: .1em; }
 }
 .rad input {
   font-size: x-small;
+}
+
+.inlineSelects {
+  display: block;
+}
+
+.inlineSelects select {
+  width: auto;
+}
+
+#work ul li {
+  margin-left: 1.2em;
 }
 /* Checkbox labels need some indent */
 label.cblabel {
