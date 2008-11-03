@@ -37,7 +37,7 @@ class TestOpenid < Pasaporte::WebTest
   
   def teardown
     # Delete all the associations created during the test case
-    Phixated::ARSession.delete_all; Association.delete_all; Approval.delete_all; Throttle.delete_all
+    JulikState::State.delete_all; Association.delete_all; Approval.delete_all; Throttle.delete_all
     # Delete the store
     FileUtils.rm_rf('openid-consumer-store')
     # Call super for flexmock a.o.

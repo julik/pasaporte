@@ -1,8 +1,8 @@
 require File.dirname(__FILE__) + '/helper'
 
 silence_warnings do
-  require 'auth/yaml_table'
-  require 'auth/yaml_digest_table'
+  require 'pasaporte/auth/yaml_table'
+  require 'pasaporte/auth/yaml_digest_table'
 end
 
 class TestAuthBackends < Camping::ModelTest
