@@ -12,10 +12,11 @@ require 'pasaporte/faster_openid'
 require 'pasaporte/julik_state'
 require 'pasaporte/markaby_ext'
 
-# Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
 
 module Pasaporte
+  module Auth; end # Acts as a container for auth classes
+  
   MAX_FAILED_LOGIN_ATTEMPTS = 3
   THROTTLE_FOR = 2.minutes
   DEFAULT_COUNTRY = 'nl'
@@ -23,8 +24,6 @@ module Pasaporte
   ALLOW_DELEGATION = true
   VERSION = '0.0.1'
   SESSION_LIFETIME = 10.hours
-  
-  module Auth; end
   
   LOGGER = Logger.new(STDERR) #:nodoc:
   PATH = File.expand_path(__FILE__) #:nodoc:
@@ -43,14 +42,17 @@ module Pasaporte
   # Reads and applies pasaporte/config.yml to the constants
   def self.apply_config!
      silence_warnings do
-      begin
-        fc = File.read(File.dirname(PATH) + '/pasaporte/config.yml')
-        YAML::load(fc).each_pair do |k, v|
-          # Cause us to fail if this constant does not exist
-          norm = k.to_s.upcase.to_sym
-          const_get(norm); const_set(norm, v)
+      paths_to_analyze = [ENV['HOME'] + '/pasaporte-config.yml', File.dirname(PATH) + '/pasaporte/config.yml']
+      paths_to_analyze.each do | config_path |
+        begin
+          fc = File.read(config_path)
+          YAML::load(fc).each_pair do |k, v|
+            # Cause us to fail if this constant does not exist
+            norm = k.to_s.upcase.to_sym
+            const_get(norm); const_set(norm, v)
+          end
+        rescue Errno::ENOENT # silence
         end
-      rescue Errno::ENOENT # silence
       end
     end
   end

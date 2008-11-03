@@ -233,6 +233,7 @@ class TestProfileEditor < Pasaporte::WebTest
     assert_response :success
     assert_not_nil @assigns.err, "An error message should be assigned"
     assert_match /Cannot save/, @assigns.err, "The error message should describe the problem"
+    
     prof = @assigns.profile
     prof.reload
     assert_nil prof.openid_server, "Nothing should have been assigned"

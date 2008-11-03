@@ -18,7 +18,7 @@ Hoe.new('Pasaporte', Pasaporte::VERSION) do |p|
   p.url = "http://julik.nl/projects/pasaporte"
   p.rdoc_pattern = /README.txt|CHANGELOG.txt|app/
   p.clean_globs = ['**.log', 'coverage', 'coverage.data']
-  p.extra_deps = ['activerecord', 'camping', 'ruby-openid', 'flexmock']
+  p.extra_deps = ['activerecord', 'camping', ['ruby-openid', '>=2.1.0'], 'flexmock']
 end
 
 desc "Generate the proper list of country codes from the ISO list"
