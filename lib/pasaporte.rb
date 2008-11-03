@@ -828,7 +828,7 @@ module Pasaporte
     class ProfilePage < personal
       def get(nick)
         @nickname = nick
-        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
+#        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
         @title = "#{@nickname}'s profile" 
         @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
         @no_toolbar = true
