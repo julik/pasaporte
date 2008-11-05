@@ -27,13 +27,20 @@ module JulikState
     raise "Cannot save session" unless res
   end
   
-  def service(*a)
-    
-    fresh = Camping::H[{}]
-    @js_rec = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(:app => _appn, :blob => fresh,
-      :sid => (@cookies.jsid ||= _sid))
-    
+  def reset_session!
+    @cookies.jsid = _sid
+    @js_rec.destroy unless @js_rec.new_record?
+    initialize_session!
+  end
+  
+  def initialize_session!(with = Camping::H[{}])
+    @js_rec = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(
+      :app => _appn, :blob => with, :sid => (@cookies.jsid ||= _sid))
     @state = @js_rec.blob.dup
+  end
+  
+  def service(*a)
+    initialize_session!
     @msg = @state.delete(:msg)
     returning(super(*a)) do
       force_session_save! if (@state != @js_rec.blob)
