@@ -465,21 +465,21 @@ module Pasaporte
         begin
           @oid_request = openid_request_from_input_or_session
           
-          LOGGER.info "pasaporte: user #{@nickname} must not be throttled"
+          LOGGER.info "OpenID: user #{@nickname} must not be throttled"
           deny_throttled!
           
-          LOGGER.info "pasaporte: nick must match the identity URL"
+          LOGGER.info "OpenID: nick must match the identity URL"
           check_nickname_matches_identity_url
           
-          LOGGER.info "pasaporte: user must be logged in"
+          LOGGER.info "OpenID: user must be logged in"
           check_logged_in
           
           @profile = profile_by_nickname(@nickname)
           
-          LOGGER.info "pasaporte: trust root is on the approvals list"
+          LOGGER.info "OpenID: trust root is on the approvals list"
           check_if_previously_approved
           
-          LOGGER.info "pasaporte: OpenID verified, redirecting"
+          LOGGER.info "OpenID: OpenID verified, redirecting"
           
           succesful_resp = @oid_request.answer(true)
           add_sreg(@oid_request, succesful_resp)
@@ -487,23 +487,23 @@ module Pasaporte
         rescue NoOpenidRequest
           return 'This is an OpenID server endpoint.'
         rescue ProtocolError => e
-          LOGGER.error "pasaporte: Cannot decode the OpenID request - #{e.message}"
+          LOGGER.error "OpenID: Cannot decode the OpenID request - #{e.message}"
           return "Something went wrong processing your request"
         rescue PleaseLogin => e
           # There is a subtlety here. If the user had NO session before entering
           # this, he will get a new SID upon arriving at the signon page and thus
           # will loose his openid request
           force_session_save!
-          LOGGER.warn "pasaporte: suspend - the user needs to login first, saving session"
+          LOGGER.warn "OpenID: suspend - the user needs to login first, saving session"
           @oid_request.immediate ? ask_user_to_approve : (raise e)
         rescue NeedsApproval
-          LOGGER.warn "pasaporte: suspend - the URL needs approval first"
+          LOGGER.warn "OpenID: suspend - the URL needs approval first"
           ask_user_to_approve
         rescue Denied => d
-          LOGGER.warn "pasaporte: deny OpenID to #{@nickname} - #{d.message}"
+          LOGGER.warn "OpenID: deny OpenID to #{@nickname} - #{d.message}"
           send_openid_response(@oid_request.answer(false))
         rescue Secure::Throttled => e
-          LOGGER.warn "pasaporte: deny OpenID to #{@nickname} - user is throttled"
+          LOGGER.warn "OpenID: deny OpenID to #{@nickname} - user is throttled"
           send_openid_response(@oid_request.answer(false))
         end
       end
@@ -637,7 +637,12 @@ module Pasaporte
         deny_throttled!
         return redirect(DashPage, @state.nickname) if @state.nickname 
         if nick && @state.pending_openid
-          humane = URI.parse(@state.pending_openid.trust_root).host
+          humane = begin
+            URI.parse(@state.pending_openid.trust_root).host
+          rescue URI::InvalidURIError
+            LOGGER.error "Failed to parse #{@state.pending_openid.trust_root}"
+            @state.pending_openid.trust_root
+          end
           show_message "Before authorizing with <b>#{humane}</b> you will need to login"
         end
         @nickname = nick;
@@ -726,8 +731,7 @@ module Pasaporte
     class Signout < personal(:signout)
       def get_with_nick
         (redirect R(Signon, @nickname); return) unless is_logged_in?
-        # reset the session in our part only
-        @state = Camping::H.new
+        reset_session!
         @state.msg = "Thanks for using the service and goodbye"
         redirect R(Signon, @nickname)
       end
