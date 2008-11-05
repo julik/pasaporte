@@ -977,9 +977,11 @@ module Pasaporte
       @headers['Content-type'] = 'text/html'
       xhtml_transitional do
         head do
-          link :rel => "openid.server", :href => _openid_server_uri 
-          if @profile.delegates_openid?
-            link :rel => "openid.delegate", :href => _openid_delegate_uri
+          if @profile
+            link :rel => "openid.server", :href => _openid_server_uri 
+            if @profile.delegates_openid?
+              link :rel => "openid.delegate", :href => _openid_delegate_uri
+            end
           end
           # meta 'http-equiv' => 'X-XRDS-Location', :content => (_our_identity_url + '/yadis')
           link :rel => "stylesheet", :href => _s("pasaporte.css")
