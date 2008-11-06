@@ -557,13 +557,13 @@ module Pasaporte
       
       def check_nickname_matches_identity_url
         nick_from_uri = @oid_request.identity.to_s.split(/\//).pop
-#        if (nick_from_uri != @nickname)
-#          raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
-#        end
-  
-#        if (@state.nickname && (nick_from_uri != @state.nickname))
-#          raise Denied, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
-#        end
+        if (nick_from_uri != @nickname)
+          raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
+        end
+ 
+        if (@state.nickname && (nick_from_uri != @state.nickname))
+          raise Denied, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
+        end
       end
   
       def check_logged_in
@@ -1097,9 +1097,7 @@ module Pasaporte
     def _our_endpoint_uri
       uri = "#{@env.HTTPS.to_s.downcase == 'on' ? 'https' : 'http'}://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
       OpenID::URINorm.urinorm(uri)
-      # investigate - Workaround for Plaxo - 
-      # http://groups.google.com/group/openid4java/browse_thread/thread/073ce0a54b2139df
-      uri # + "?" + _sid[0..8]
+      uri
     end
     
     def _our_identity_url
