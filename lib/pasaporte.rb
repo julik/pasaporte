@@ -139,18 +139,14 @@ module Pasaporte
       end
     end
     
-    def expire_old_sessions!
-      day_zero = (Time.now - SESSION_LIFETIME).to_s(:db)
-     # JulikState::State.delete_all(["modified_at < ?", day_zero])
-    end
-    
     def _init_token_box!
+      LOGGER.warn "Cookiez " +  @cookies.inspect
+      LOGGER.warn "State " +  @state.inspect
       @state.token_box ||= TokenBox.new
     end
     
     def service(*a)
       begin
-        expire_old_sessions!
         _init_token_box!
         @ctr = self.class.to_s.split('::').pop
         super(*a)
