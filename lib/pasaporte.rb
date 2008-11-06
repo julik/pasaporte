@@ -957,6 +957,7 @@ module Pasaporte
     
     def _csrf_token
       input :name => :tok, :type => :hidden, :value => @state.token_box.procure!(@env.REQUEST_URI)
+      LOGGER.warn "After token procurement #{@state.token_box.inspect}"
     end
     
     def openid_server
