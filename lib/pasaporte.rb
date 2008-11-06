@@ -683,6 +683,7 @@ module Pasaporte
       end
       
       def post(n=nil)
+        LOGGER.warn @input.inspect
         begin
           deny_throttled!
         rescue Pasaporte::Secure::Throttled => th
