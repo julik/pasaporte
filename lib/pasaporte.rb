@@ -129,6 +129,7 @@ module Pasaporte
         raise RedirectToSSL if PARTIAL_SSL && !@env.HTTPS
       end
       
+      # When partial SSL is enabled we use this method to force a plain page
       def require_plain!
         raise RedirectToPlain if PARTIAL_SSL && @env.HTTPS
       end
