@@ -148,7 +148,7 @@ module Pasaporte
     
     def expire_old_sessions!
       day_zero = (Time.now - SESSION_LIFETIME).to_s(:db)
-      JulikState::State.delete_all(["modified_at < ?", day_zero])
+     # JulikState::State.delete_all(["modified_at < ?", day_zero])
     end
     
     def _init_token_box!
