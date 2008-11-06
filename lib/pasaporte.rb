@@ -131,6 +131,7 @@ module Pasaporte
       def validate_token!
         from = URI.parse(@env.HTTP_REFERER).path
         LOGGER.debug "Validating form token"
+        _init_token_box!
         @state.token_box.validate!(from, @input.tok)
       end
       
@@ -140,14 +141,15 @@ module Pasaporte
     end
     
     def _init_token_box!
-      LOGGER.warn "Cookiez " +  @cookies.inspect
-      LOGGER.warn "State " +  @state.inspect
-      @state.token_box ||= TokenBox.new
+      unless @state.token_box
+        LOGGER.warn "Cookiez " +  @cookies.inspect
+        LOGGER.warn "State " +  @state.inspect
+        @state.token_box = TokenBox.new
+      end
     end
     
     def service(*a)
       begin
-        _init_token_box!
         @ctr = self.class.to_s.split('::').pop
         super(*a)
       rescue FullStop
@@ -946,6 +948,7 @@ module Pasaporte
     end
     
     def _csrf_token
+      _init_token_box!
       input :name => :tok, :type => :hidden, :value => @state.token_box.procure!(@env.REQUEST_URI)
       LOGGER.warn "After token procurement #{@state.token_box.inspect}"
     end
