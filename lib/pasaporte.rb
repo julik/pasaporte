@@ -17,7 +17,6 @@ Camping.goes :Pasaporte
 Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
 
-
 #OpenID::DefaultNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1'], ['HMAC-SHA1', 'no-encryption']])
 #OpenID::EncryptedNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1']])
 
@@ -941,8 +940,9 @@ module Pasaporte
       # Associations etc are sharded per domain on which Pasaporte sits
       @store.pasaporte_domain = @env['SERVER_NAME']
       
-      # we also need to provide endopint URL - this is where Pasaporte is mounted
-      @server ||= OpenID::Server::Server.new(@store, @env['SERVER_NAME'])
+      # we also need to provide endopint URL - this is where Pasaporte is mounted.
+      # Op-endpoint is the endpoint used by the server
+      @server ||= OpenID::Server::Server.new(@store, _our_endpoint_uri)
       @server
     end
     
