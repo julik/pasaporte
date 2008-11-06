@@ -547,13 +547,13 @@ module Pasaporte
       
       def check_nickname_matches_identity_url
         nick_from_uri = @oid_request.identity.to_s.split(/\//).pop
-        if (nick_from_uri != @nickname)
-          raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
-        end
+#        if (nick_from_uri != @nickname)
+#          raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
+#        end
   
-        if (@state.nickname && (nick_from_uri != @state.nickname))
-          raise Denied, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
-        end
+#        if (@state.nickname && (nick_from_uri != @state.nickname))
+#          raise Denied, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
+#        end
       end
   
       def check_logged_in
