@@ -14,6 +14,7 @@ $: << File.dirname(__FILE__)
 
 Camping.goes :Pasaporte
 
+Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
 
 
@@ -889,6 +890,7 @@ module Pasaporte
           redirect uri.to_s; return
         end
         
+        LOGGER.warn "Profile page GET for #{nick}, sending YADIS header"
         @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
         @title = "#{@nickname}'s profile" 
         @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
