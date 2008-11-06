@@ -10,25 +10,13 @@ $: << File.dirname(__FILE__)
   openid/extensions/sreg
   pasaporte/julik_state
   pasaporte/markaby_ext
+  pasaporte/hacks
 ).each {|r| require r }
 
 Camping.goes :Pasaporte
 
 Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
-
-#OpenID::DefaultNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1'], ['HMAC-SHA1', 'no-encryption']])
-#OpenID::EncryptedNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1']])
-
-# Start an XML tag.  We override to get "<stupidbrowserfriendly />" fwd slash
-class Builder::XmlMarkup
-  def _start_tag(sym, attrs, end_too=false)
-    @target << "<#{sym}"
-    _insert_attributes(attrs)
-    @target << " /" if end_too #HIER!!
-    @target << ">"
-  end
-end
 
 module Pasaporte
   module Auth; end # Acts as a container for auth classes
@@ -110,6 +98,8 @@ module Pasaporte
     class PleaseLogin < RuntimeError; end
     class Throttled < RuntimeError; end
     class FullStop < RuntimeError; end
+    class RedirectToSSL < RuntimeError; end
+    class RedirectToPlain < RuntimeError; end
     
     module CheckMethods
       def _redir_to_login_page!(persistables)
@@ -121,7 +111,7 @@ module Pasaporte
       end
       
       # Allow the user to log in. Suspend any variables passed in the session.
-      def require_login(persistables = {})
+      def require_login!(persistables = {})
         deny_throttled!
         raise "No nickname" unless @nickname
         _redir_to_login_page!(persistables) unless is_logged_in?
@@ -133,7 +123,16 @@ module Pasaporte
       def deny_throttled!
         raise Throttled if Models::Throttle.throttled?(env)
       end
-    
+      
+      # When partial SSL is enabled we use this method to redirect
+      def require_ssl!
+        raise RedirectToSSL if PARTIAL_SSL && !@env.HTTPS
+      end
+      
+      def require_plain!
+        raise RedirectToPlain if PARTIAL_SSL && @env.HTTPS
+      end
+      
       def profile_by_nickname(n)
         ::Pasaporte::Models::Profile.find_or_create_by_nickname_and_domain_name(n, my_domain)
       end
@@ -159,6 +158,22 @@ module Pasaporte
       rescue Throttled
         LOGGER.info "#{env['REMOTE_ADDR']} - Throttled user tried again"
         redirect R(Pasaporte::Controllers::ThrottledPage)
+        return self
+      rescue RedirectToSSL
+        LOGGER.info "Forcing redirect to SSL page"
+        the_uri = URI.parse(@env.REQUEST_URI)
+        the_uri.host = @env.SERVER_NAME
+        the_uri.scheme = 'https'
+        the_uri.port = SSL_PORT unless SSL_PORT.to_i == 443
+        redirect the_uri.to_s
+        return self
+      rescue RedirectToPlain
+        LOGGER.info "Forcing redirect to plain (non-SSL) page"
+        the_uri = URI.parse(@env.REQUEST_URI)
+        the_uri.host = @env.SERVER_NAME
+        the_uri.scheme = 'http'
+        the_uri.port = HTTP_PORT unless HTTP_PORT.to_i == 80
+        redirect the_uri.to_s
         return self
       end
       self
@@ -484,6 +499,7 @@ module Pasaporte
       class NoOpenidRequest < RuntimeError; end  #:nodoc
       
       def get_with_nick
+        require_plain!
         begin
           @oid_request = openid_request_from_input_or_session
           
@@ -531,6 +547,7 @@ module Pasaporte
       end
   
       def post_with_nick
+        require_plain!
         req = openid_server.decode_request(input)
         raise ProtocolError, "The decoded request was nil" if req.nil?
         # Check for dumb mode HIER!
@@ -568,7 +585,7 @@ module Pasaporte
   
       def check_logged_in
         message = "Before authorizing '%s' you will need to login" % input["openid.trust_root"]
-        require_login(:pending_openid => @oid_request, :msg => message)
+        require_login!(:pending_openid => @oid_request, :msg => message)
       end
       
       def ask_user_to_approve
@@ -628,7 +645,7 @@ module Pasaporte
     
     class ApprovalsPage < personal(:approvals)
       def get_with_nick
-        require_login
+        require_login!
         @approvals = @profile.approvals
         if @approvals.empty?
           @msg = 'You currently do not have any associations with other sites through us'
@@ -641,7 +658,7 @@ module Pasaporte
     
     class DeleteApproval < personal('disapprove/(\d+)')
       def get_with_nick(appr_id)
-        require_login
+        require_login!
         ap = @profile.approvals.find(appr_id); ap.destroy
         show_message "The site #{ap} has been removed from your approvals list"
         redirect R(ApprovalsPage, @nickname)
@@ -667,33 +684,14 @@ module Pasaporte
           show_message "Before authorizing with <b>#{humane}</b> you will need to login"
         end
         
-        if PARTIAL_SSL && !@env.HTTPS
-          signon_url = nick ? R(Signon, nick) : R(Signon)
-          uri = URI.parse(signon_url)
-          uri.host, uri.scheme = my_domain, "https"
-          uri.port = SSL_PORT unless SSL_PORT == 443
-          
-          LOGGER.warn "Using partial SSL for login - redirecting to #{uri}"
-          redirect uri.to_s; return
-        end
+        require_ssl!
         
         @nickname = nick;
         render :signon_form
       end
       
       def post(n=nil)
-        # WORKAROUND for Plaxo - when doing openid_complete, they somehow
-        # post to the root URL while they need to post to the endpoint instead
-        if @input["openid.mode"] && @env.HTTP_USER_AGENT =~ /opkele/
-          instead = Openid.new(StringIO.new(''), @env, "POST")
-          # Deduct the nickname from the claimed id
-          nickname = 'julian'
-          instead.input = @input
-          instead.post(nickname)
-          return instead
-        end
         
-        LOGGER.warn @input.inspect
         begin
           deny_throttled!
         rescue Pasaporte::Secure::Throttled => th
@@ -703,6 +701,8 @@ module Pasaporte
           end
           raise th
         end
+        
+        require_ssl!
         
         if PARTIAL_SSL && !@env.HTTPS
           signon_url = n ? R(Signon, n) : R(Signon)
@@ -795,13 +795,16 @@ module Pasaporte
     # when associating for the first time
     class Decide < personal(:decide)
       def get_with_nick
-        require_login
+        require_ssl!
+        require_login!
+        
         @oid_request = @state.pending_openid
         render :decide
       end
       
       def post_with_nick
-        require_login
+        require_ssl!
+        require_login!
         if !@state.pending_openid
           @report = "There is no OpenID request to approve anymore. Looks like it went out already."
           render :bailout
@@ -818,12 +821,14 @@ module Pasaporte
     # Allows the user to modify the settings
     class EditProfile < personal(:edit)
       def get_with_nick
-        require_login
+        require_login!
+        require_ssl!
         render :profile_form
       end
       
       def post_with_nick
-        require_login
+        require_login!
+        require_ssl!
         _collapse_checkbox_input(input)
         
         if @profile.update_attributes(input.profile)
@@ -894,12 +899,7 @@ module Pasaporte
         @nickname = nick
         # Redirect the OpenID requesting party to the usual HTTP so that
         # the OpenID procedure takes place without SSL
-        if PARTIAL_SSL && @env.HTTPS
-          uri = URI.parse(R(ProfilePage, nick))
-          uri.scheme, uri.server = 'http', my_domain
-          uri.port = HTTP_PORT unless HTTP_PORT == 80
-          redirect uri.to_s; return
-        end
+        require_plain!
         
         LOGGER.warn "Profile page GET for #{nick}, sending YADIS header"
         @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
@@ -911,7 +911,7 @@ module Pasaporte
     end
     
     class DashPage < personal(:prefs)
-      def get_with_nick; require_login; render :dash; end
+      def get_with_nick; require_login!; render :dash; end
     end
   end
   
