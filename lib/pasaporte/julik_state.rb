@@ -43,7 +43,7 @@ module JulikState
     initialize_session!
     @msg = @state.delete(:msg)
     returning(super(*a)) do
-      force_session_save! unless @state.empty?
+      force_session_save!
     end
   end
 end
