@@ -11,6 +11,7 @@ $: << File.dirname(__FILE__)
   pasaporte/julik_state
   pasaporte/markaby_ext
   pasaporte/hacks
+  pasaporte/token_box
 ).each {|r| require r }
 
 Camping.goes :Pasaporte
@@ -27,13 +28,14 @@ module Pasaporte
   DEFAULT_TZ = 'Europe/Amsterdam'
   ALLOW_DELEGATION = true
   VERSION = '0.0.1'
-  SESSION_LIFETIME = 10.hours
+  SESSION_LIFETIME = 12.hours
   PARTIAL_SSL = false
   HTTP_PORT = 80
   SSL_PORT = 443
   
   LOGGER = Logger.new(STDERR) #:nodoc:
   PATH = File.expand_path(__FILE__) #:nodoc:
+  TOKEN_BOX = TokenBox.new
   
   # Stick your super auth HERE. Should be a proc accepting login, pass and domain
   my_little_auth = lambda do | login, pass, domain |
@@ -134,6 +136,12 @@ module Pasaporte
         raise RedirectToPlain if PARTIAL_SSL && @env.HTTPS
       end
       
+      def validate_token!
+        from = URI.parse(@env.HTTP_REFERER).path
+        LOGGER.debug "Validating form token"
+        @state.token_box.validate!(from, @input.tok)
+      end
+      
       def profile_by_nickname(n)
         ::Pasaporte::Models::Profile.find_or_create_by_nickname_and_domain_name(n, my_domain)
       end
@@ -141,13 +149,17 @@ module Pasaporte
     
     def expire_old_sessions!
       day_zero = (Time.now - SESSION_LIFETIME).to_s(:db)
-      # JulikState.expire_old(SESSION_LIFETIME)
-      # Camping::Models::Session.delete_all("created_at < '%s'" % day_zero)
+      JulikState::State.delete_all(["modified_at < ?", day_zero])
+    end
+    
+    def _init_token_box!
+      @state.token_box ||= TokenBox.new
     end
     
     def service(*a)
       begin
         expire_old_sessions!
+        _init_token_box!
         @ctr = self.class.to_s.split('::').pop
         super(*a)
       rescue FullStop
@@ -160,6 +172,9 @@ module Pasaporte
         LOGGER.info "#{env['REMOTE_ADDR']} - Throttled user tried again"
         redirect R(Pasaporte::Controllers::ThrottledPage)
         return self
+      rescue TokenBox::Invalid
+        LOGGER.warn "Form token has been compromised on #{@env.REQUEST_URI}"
+        redirect R(Pasaporte::Controllers::FormExpired)
       rescue RedirectToSSL
         LOGGER.info "Forcing redirect to SSL page"
         the_uri = URI.parse(@env.REQUEST_URI)
@@ -325,7 +340,17 @@ module Pasaporte
         remove_column :pasaporte_associations, :pasaporte_domain
       end
     end
-  
+    
+    class SetupTokenBox < V(1.4)
+      def self.up
+        add_column :pasaporte_profiles, :token_box, :text
+      end
+      
+      def self.down
+        remove_column :pasaporte_profiles, :token_box, :text
+      end
+    end
+    
     # Minimal info we store about people. It's the container for the sreg data
     # in the first place.
     class Profile < Base
@@ -705,19 +730,15 @@ module Pasaporte
         
         require_ssl!
         
-        if PARTIAL_SSL && !@env.HTTPS
-          signon_url = n ? R(Signon, n) : R(Signon)
-          uri = URI.parse(signon_url)
-          uri.host, uri.scheme = my_domain, "https"
-          uri.port = @env.SERVER_PORT unless @env.SERVER_PORT == '80'
-          LOGGER.warn "Using partial SSL for login - redirecting to #{uri}"
-          redirect uri.to_s; return
-        end
-        
         @nickname = @input.login || n || (raise "No nickname to authenticate")
+        
         # The throttling logic must be moved into throttles apparently
+        
         # Start counting
         @state.failed_logins ||= 0
+        
+        # Validate token
+        validate_token!
         
         # If the user reaches the failed login limit we ban him for a while and
         # tell the OpenID requesting party to go away
@@ -830,6 +851,8 @@ module Pasaporte
       def post_with_nick
         require_login!
         require_ssl!
+        validate_token!
+        
         _collapse_checkbox_input(input)
         
         if @profile.update_attributes(input.profile)
@@ -885,6 +908,13 @@ module Pasaporte
         render :bailout
       end
     end
+    
+    class FormExpired < R('/form-expired')
+      def get
+        @report = "The form has expired unfortunately"
+        render :bailout
+      end
+    end
   
     # Just show a public profile page. Before the user logs in for the first time
     # it works like a dummy page. After the user has been succesfully authenticated he can
@@ -934,7 +964,11 @@ module Pasaporte
         (v == ["0", "1"]) ? (ha[k] = "1") : (v.is_a?(Hash) ? _collapse_checkbox_input(v) : true)
       end
     end
-  
+    
+    def _csrf_token
+      input :name => :tok, :type => :hidden, :value => @state.token_box.procure!(@env.REQUEST_URI)
+    end
+    
     def openid_server
       @store ||= PasaporteStore.new
       
@@ -1036,6 +1070,7 @@ module Pasaporte
           self << "Your password:"
           input.pass! :name => "pass", :type => "password"
         end
+        _csrf_token
         input :type => :submit, :value => 'Log me in'
       end
     end
@@ -1128,12 +1163,13 @@ module Pasaporte
       end
       
       form :method => :post do
+        _csrf_token
         input :name => :pleasedo, :type => :submit, :value => " Yes, do allow "
         self << '&#160;'
         input :name => :nope, :type => :submit, :value => " No, they are villains! "
       end
     end
-
+    
     def _toolbar
       # my profile button
       # log me out button
@@ -1181,7 +1217,7 @@ module Pasaporte
       form(:method => :post) do
         
         h2 "Your profile"
-        
+        _csrf_token
         label.cblabel :for => :share_info do
           _cbox :profile, :shared, :id => :share_info 
           self << '&#160; Share your info on your OpenID page'
