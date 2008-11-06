@@ -4,7 +4,7 @@ This is Pasaporte, a small identity server with a colored bar on top. It's in th
 of Crowd (but smaller). Will act as a mediator between OpenID and arbitary services where
 users are distinguished by their nickname (login), their password and a domain name.
 
-==The idea
+== The idea
 
 Pasaporte brings OpenID to the traditional simplicity of
 
@@ -19,7 +19,7 @@ Should the password become stale or should the authentication backend say that i
 longer has the user in question the authorization tokens are immediately revoked, and any
 authorization requests will be denied.
 
-==Using SSL
+== Using SSL
 
 It is recommended that you run pasaporte in full SSL mode. However,
 some OpenID consumers disallow OpenID providers with self-signed (i.e. free)
@@ -35,15 +35,11 @@ unencrypted (will redirect to non-secure port).
 
 Partial SSL is disabled by default - to enable set PARTIAL_SSL to true.
 
-==Current issues
+== Current issues
 
-As of now, the following sites do not support Pasaporte as a provider:
+As of now, we are not aware of sites that cannot consume OpenID from Pasaporte.
 
-yadis.org
-blogger.com (all blogs)
-plaxo.com
-
-==Configuration
+== Configuration
 
 The adventurous among us can override the defaults (Pasaporte constants) by placing a
 hash-formatted YAML file called "config.yml" in the pasaporte dir. And don't ask me what
@@ -59,12 +55,12 @@ PARTIAL_SSL - see above
 HTTP_PORT - if partial SSL is used, the port on which the standard version runs
 SSL_PORT - if partial SSL is used, the port on which the secure version runs
 
-==Profiles
+== Profiles
 
 Pasaporte allows the user to have a simple passport page, where some info can be placed
 for people who follow the OpenID profile URL. Sharing the information is entirelly optional.
 
-==The all-id
+== The all-id
 
 The login that you use is ultimately the nickname that comes in the URL. For that reason
 no other login name can be entered in the form. However the user still can verify that
@@ -79,20 +75,20 @@ It's important to understand that a Profile record is a helper for metadata and 
 something authoritative - it's the auth routine that takes the actual decision about the
 user's state.
 
-==Persistence
+== Persistence
 
 We store some data that the user might find useful to store and maybe display on his user
 page. No sessions of the exchange are kept
 except of the standard OpenID shared secrets (there are not linked to user records in any
 way).
 
-==SREG data sharing
+== SREG data sharing
 
 There is currently no provision for fetching SREG data (like email, date of birth and such)
 from the autorizing routine. We might consider this in the future, for now the user has to
 fill it in himself.
 
-==Sharding
+== Sharding
 
 The users in Pasaporte are segregated by the domain name of Pasaporte server. That is, if
 you have two domains pointed at +one+ Pasaporte, you will not have name clashes between
