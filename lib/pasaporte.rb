@@ -683,6 +683,17 @@ module Pasaporte
       end
       
       def post(n=nil)
+        # WORKAROUND for Plaxo - when doing openid_complete, they somehow
+        # post to the root URL while they need to post to the endpoint instead
+        if @input["openid.mode"] && @env.HTTP_USER_AGENT =~ /opkele/
+          instead = Openid.new(StringIO.new(''), @env, "POST")
+          # Deduct the nickname from the claimed id
+          nickname = 'julian'
+          instead.input = @input
+          instead.post(nickname)
+          return instead
+        end
+        
         LOGGER.warn @input.inspect
         begin
           deny_throttled!
