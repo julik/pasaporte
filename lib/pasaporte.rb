@@ -8,7 +8,6 @@ $: << File.dirname(__FILE__)
   camping/session
   openid
   openid/extensions/sreg
-  pasaporte/faster_openid
   pasaporte/julik_state
   pasaporte/markaby_ext
 ).each {|r| require r }
@@ -16,6 +15,10 @@ $: << File.dirname(__FILE__)
 Camping.goes :Pasaporte
 
 Markaby::Builder.set(:output_xml_instruction, false)
+
+
+OpenID::DefaultNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1'], ['HMAC-SHA1', 'no-encryption']])
+OpenID::EncryptedNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1']])
 
 module Pasaporte
   module Auth; end # Acts as a container for auth classes
