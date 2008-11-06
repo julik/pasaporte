@@ -1082,7 +1082,9 @@ module Pasaporte
     def _our_endpoint_uri
       uri = "#{@env.HTTPS.to_s.downcase == 'on' ? 'https' : 'http'}://" + [env["HTTP_HOST"], env["SCRIPT_NAME"], R(Openid, @nickname)].join('/').squeeze('/')
       OpenID::URINorm.urinorm(uri)
-      uri
+      # Workaround for Plaxo - 
+      # http://groups.google.com/group/openid4java/browse_thread/thread/073ce0a54b2139df
+      uri + "?" + _sid[0..8]
     end
     
     def _our_identity_url
