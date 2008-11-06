@@ -341,16 +341,6 @@ module Pasaporte
       end
     end
     
-    class SetupTokenBox < V(1.4)
-      def self.up
-        add_column :pasaporte_profiles, :token_box, :text
-      end
-      
-      def self.down
-        remove_column :pasaporte_profiles, :token_box, :text
-      end
-    end
-    
     # Minimal info we store about people. It's the container for the sreg data
     # in the first place.
     class Profile < Base
