@@ -1273,9 +1273,10 @@ module Pasaporte
   def self.create
     JulikState.create_schema
     self::Models.create_schema
-    self::LOGGER.warn "Deleting stale sessions"
-    JulikState::State.delete_all
-    self::LOGGER.warn "Deleting set throttles"
-    self::Models::Throttle.delete_all
+    self::LOGGER.warn "Deleting sessions, assocs and nonces"
+    [self::Models::Throttle, self::Models::Nonce, 
+     self::Models::Association, JulikState::State].each do | m |
+      m.delete_all
+    end
   end
 end
