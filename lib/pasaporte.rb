@@ -21,6 +21,16 @@ Markaby::Builder.set(:output_xml_instruction, false)
 OpenID::DefaultNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1'], ['HMAC-SHA1', 'no-encryption']])
 OpenID::EncryptedNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1']])
 
+# Start an XML tag.  We override to get "<stupidbrowserfriendly />" fwd slash
+class Builder::XmlMarkup
+  def _start_tag(sym, attrs, end_too=false)
+    @target << "<#{sym}"
+    _insert_attributes(attrs)
+    @target << " /" if end_too #HIER!!
+    @target << ">"
+  end
+end
+
 module Pasaporte
   module Auth; end # Acts as a container for auth classes
   
@@ -865,17 +875,7 @@ module Pasaporte
     class ProfilePage < personal
       
       def head(nick)
-        @nickname = nick
-        # Redirect the OpenID requesting party to the usual HTTP so that
-        # the OpenID procedure takes place without SSL
-        if PARTIAL_SSL && @env.HTTPS
-          uri = URI.parse(R(ProfilePage, nick))
-          uri.scheme, uri.server = 'http', my_domain
-          uri.port = HTTP_PORT unless HTTP_PORT == 80
-          redirect uri.to_s; return
-        end
-        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
-        LOGGER.warn "Profile page HEADed for #{nick}, sending YADIS header"
+        get(nick)
         return
       end
       
