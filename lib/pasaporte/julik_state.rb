@@ -22,7 +22,6 @@ module JulikState
   def _appn; self.class.to_s.split(/::/).shift; end
   
   def force_session_save!
-    @cookies.jsid ||= _sid
     res = @js_rec.update_attributes :blob => @state, :sid => @cookies.jsid
     raise "Cannot save session" unless res
   end
@@ -35,7 +34,7 @@ module JulikState
   
   def initialize_session!(with = Camping::H[{}])
     @js_rec = State.find_by_sid_and_app(@cookies.jsid, _appn) || State.new(
-      :app => _appn, :blob => with, :sid => (@cookies.jsid ||= _sid))
+      :app => _appn, :blob => with, :sid => (@cookies.jsid = _sid))
     @state = @js_rec.blob.dup
   end
   

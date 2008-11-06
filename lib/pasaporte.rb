@@ -87,13 +87,6 @@ module Pasaporte
     end
   end
   
-  module LoggerHijack
-    #def service(*the_rest)
-    #  _hijacked, OpenID::Util.logger = OpenID::Util.logger, LOGGER
-    #  returning(super(*the_rest)) { OpenID::Util.logger = _hijacked }
-    #end
-  end
-  
   # Or a semblance thereof
   module Secure
     class PleaseLogin < RuntimeError; end
@@ -204,10 +197,10 @@ module Pasaporte
     end
   end
   
-  # The order here is important. Camping::Session has to come LAST (innermost)
+  # The order here is important. Camping::Session has to come LAST (outermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, CookiePreservingRedirect, Secure, JulikState, LoggerHijack].map{|m| include m }
+  [CampingFlash, CookiePreservingRedirect, Secure, JulikState].map{|m| include m }
   
   
   module Models
