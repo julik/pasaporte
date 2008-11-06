@@ -193,6 +193,7 @@ module Pasaporte
   module CookiePreservingRedirect
     def redirect(*args)
       @headers['Set-Cookie'] = @cookies.map { |k,v| "#{k}=#{C.escape(v)}; path=#{self/"/"}" if v != @k[k] } - [nil]
+      force_session_save!
       super(*args)
     end
   end

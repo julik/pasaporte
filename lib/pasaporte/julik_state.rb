@@ -41,8 +41,6 @@ module JulikState
   def service(*a)
     initialize_session!
     @msg = @state.delete(:msg)
-    returning(super(*a)) do
-      force_session_save!
-    end
+    returning(super(*a)) { force_session_save! }
   end
 end
