@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#! /usr/bin/env ruby
 require 'rubygems'
 require 'camping'
 require 'camping/fastcgi'
@@ -11,6 +11,10 @@ Camping::Models::Base.establish_connection(
 
 Pasaporte.create
 Pasaporte::LOGGER = Logger.new(ENV['HOME'] + "/pasaporte.log")
+
+ENV.keys.grep(/^PASAPORTE_/).each do | envar |
+  Pasaporte.const_set(envar.gsub(/^PASAPORTE_/, ''), ENV[envar])
+end
 
 serv = Camping::FastCGI.new
 serv.mount('/', Pasaporte)

@@ -19,23 +19,50 @@ Should the password become stale or should the authentication backend say that i
 longer has the user in question the authorization tokens are immediately revoked, and any
 authorization requests will be denied.
 
+==Using SSL
+
+It is recommended that you run pasaporte in full SSL mode. However,
+some OpenID consumers disallow OpenID providers with self-signed (i.e. free)
+SSL certificates. Pasaporte mitigates this by offering the "partial SSL" mode. When turned on,
+only the signon page (where the password is entered) and subsequent pages with which the user
+interacts will be protected with SSL encryption, while the public OpenID endpoint will NOT be
+SSL-enabled. Same is true for the server-server step of OpenID handshake.
+
+This will allow even stricter providers to use Pasaporte servers.
+
+When partial SSL is turned on, the profile page (OpenID identity) will forcibly be made
+unencrypted (will redirect to non-secure port).
+
+Partial SSL is disabled by default - to enable set PARTIAL_SSL to true.
+
+==Current issues
+
+As of now, the following sites do not support Pasaporte as a provider:
+
+yadis.org
+blogger.com (all blogs)
+plaxo.com
+
 ==Configuration
 
 The adventurous among us can override the defaults (Pasaporte constants) by placing a
 hash-formatted YAML file called "config.yml" in the pasaporte dir. And don't ask me what
 a "hash-formatted YAML file" is, because if you do you are not adventurous.
 
-==A word of warning
+Here the rundown of the config parameters:
 
-Considering the clear-text passwords issue, we strongly recommend running Pasaporte under
-SSL and under SSL only. But of course this might be prohibitive especially if you cannot
-be self-signed or don't have an extra IP at hand. When you run Pasaporte under HTTPS all
-URLs are going to be rewritten automatically to redirect and link to the HTTPS site.
+MAX_FAILED_LOGIN_ATTEMPTS - after how many login attempts the user will be trottled
+THROTTLE_FOR - Trottle length in seconds
+ALLOW_DELEGATION - if set to true, the user will be able to redirect his OpenID
+SESSION_LIFETIME - in seconds - how long does a session remain valid
+PARTIAL_SSL - see above
+HTTP_PORT - if partial SSL is used, the port on which the standard version runs
+SSL_PORT - if partial SSL is used, the port on which the secure version runs
 
 ==Profiles
 
 Pasaporte allows the user to have a simple passport page, where some info can be placed
-for people who follow the OpenID profile URL. Sharing the information  is entirelly optional.
+for people who follow the OpenID profile URL. Sharing the information is entirelly optional.
 
 ==The all-id
 
@@ -55,7 +82,7 @@ user's state.
 ==Persistence
 
 We store some data that the user might find useful to store and maybe display on his user
-page. No sites that the user authorizes are stored. No sessions of the exchange are kept
+page. No sessions of the exchange are kept
 except of the standard OpenID shared secrets (there are not linked to user records in any
 way).
 

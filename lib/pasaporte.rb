@@ -27,6 +27,9 @@ module Pasaporte
   ALLOW_DELEGATION = true
   VERSION = '0.0.1'
   SESSION_LIFETIME = 10.hours
+  PARTIAL_SSL = false
+  HTTP_PORT = 80
+  SSL_PORT = 443
   
   LOGGER = Logger.new(STDERR) #:nodoc:
   PATH = File.expand_path(__FILE__) #:nodoc:
@@ -523,7 +526,8 @@ module Pasaporte
         if input.keys.grep(/openid/).any?
           @state.delete(:pending_openid)
           r = openid_server.decode_request(input)
-          LOGGER.info "Starting a new OpenID session with #{r.trust_root}"
+          LOGGER.info "Starting a session #{r.trust_root} -> #{r.identity}"
+          puts r.inspect
           @state.pending_openid = r
         elsif @state.pending_openid
           LOGGER.info "Resuming an OpenID session with #{@state.pending_openid.trust_root}"
@@ -534,7 +538,7 @@ module Pasaporte
       end
       
       def check_nickname_matches_identity_url
-        nick_from_uri = @oid_request.identity.to_s.split(/\//)[-2]
+        nick_from_uri = @oid_request.identity.to_s.split(/\//).pop
         if (nick_from_uri != @nickname)
           raise Denied, "The identity '#{@oid_request.claimed_id}' does not mach the URL realm"
         end
@@ -591,14 +595,14 @@ module Pasaporte
       }
       
       def get_with_nick
-        @headers["Content-type"] = "application/xrds+xml"
+        @headers["Content-Type"] = "application/xrds+xml"
         @skip_layout = true
         YADIS_TPL % get_endpoints
       end
       
       private
         def get_endpoints
-          defaults = [_our_endpoint_uri, _our_endpoint_uri]
+          defaults = [_our_endpoint_uri, _our_identity_url]
           @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
           return defaults unless @profile && @profile.delegates_openid?
           [@profile.openid_server, @profile.openid_delegate]
@@ -645,6 +649,17 @@ module Pasaporte
           end
           show_message "Before authorizing with <b>#{humane}</b> you will need to login"
         end
+        
+        if PARTIAL_SSL && !@env.HTTPS
+          signon_url = nick ? R(Signon, nick) : R(Signon)
+          uri = URI.parse(signon_url)
+          uri.host, uri.scheme = my_domain, "https"
+          uri.port = SSL_PORT unless SSL_PORT == 443
+          
+          LOGGER.warn "Using partial SSL for login - redirecting to #{uri}"
+          redirect uri.to_s; return
+        end
+        
         @nickname = nick;
         render :signon_form
       end
@@ -659,6 +674,16 @@ module Pasaporte
           end
           raise th
         end
+        
+        if PARTIAL_SSL && !@env.HTTPS
+          signon_url = n ? R(Signon, n) : R(Signon)
+          uri = URI.parse(signon_url)
+          uri.host, uri.scheme = my_domain, "https"
+          uri.port = @env.SERVER_PORT unless @env.SERVER_PORT == '80'
+          LOGGER.warn "Using partial SSL for login - redirecting to #{uri}"
+          redirect uri.to_s; return
+        end
+        
         @nickname = @input.login || n || (raise "No nickname to authenticate")
         # The throttling logic must be moved into throttles apparently
         # Start counting
@@ -832,7 +857,16 @@ module Pasaporte
     class ProfilePage < personal
       def get(nick)
         @nickname = nick
-#        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
+        # Redirect the OpenID requesting party to the usual HTTP so that
+        # the OpenID procedure takes place without SSL
+        if PARTIAL_SSL && @env.HTTPS
+          uri = URI.parse(R(ProfilePage, nick))
+          uri.scheme, uri.server = 'http', my_domain
+          uri.port = HTTP_PORT unless HTTP_PORT == 80
+          redirect uri.to_s; return
+        end
+        
+        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
         @title = "#{@nickname}'s profile" 
         @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)
         @no_toolbar = true
@@ -970,16 +1004,17 @@ module Pasaporte
 
     def layout
       @headers['Cache-Control'] = 'no-cache; must-revalidate'
+      @headers['Content-Type'] ||= 'text/html'
+      
       if @skip_layout
         self << yield; return
       end
       
-      @headers['Content-type'] = 'text/html'
       xhtml_transitional do
         head do
+          self << '<meta http-equiv="X-XRDS-Location" content="%s/yadis" />' % _our_identity_url
           link :rel => "openid.server", :href => _openid_server_uri 
           link :rel => "openid.delegate", :href => _openid_delegate_uri
-          # meta 'http-equiv' => 'X-XRDS-Location', :content => (_our_identity_url + '/yadis')
           link :rel => "stylesheet", :href => _s("pasaporte.css")
           script :type=>'text/javascript', :src => _s("pasaporte.js")
           title(@title || ('%s : pasaporte' % env['SERVER_NAME']))
@@ -1017,7 +1052,7 @@ module Pasaporte
 
     # Render either our providing URL or the URL of the delegate    
     def _openid_delegate_uri
-      (@profile && @profile.delegates_openid?) ? @profile.openid_delegate : _our_endpoint_uri
+      (@profile && @profile.delegates_openid?) ? @profile.openid_delegate : _our_identity_url
     end
 
     # Canonicalized URL of our endpoint    
@@ -1210,9 +1245,9 @@ module Pasaporte
   def self.create
     JulikState.create_schema
     self::Models.create_schema
-    LOGGER.warn "Deleting stale sessions"
+    self::LOGGER.warn "Deleting stale sessions"
     JulikState::State.delete_all
-    LOGGER.warn "Deleting set throttles"
+    self::LOGGER.warn "Deleting set throttles"
     self::Models::Throttle.delete_all
   end
 end
