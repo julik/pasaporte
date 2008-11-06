@@ -28,9 +28,9 @@ class TokenBox
     returning(Token.new(lifetime || WINDOW)) do | t |
       @heap ||= {}
       @heap[request] ||= []
-      @heap[request].shift if @heap[request].length > MAX_TOKENS
+      @heap[request].shift if @heap[request].length == MAX_TOKENS
       @heap[request] << t
-    end
+    end.to_s
   end
   
   # Validate the token for a specific request URI
