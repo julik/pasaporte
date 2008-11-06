@@ -129,10 +129,9 @@ module Pasaporte
       end
       
       def validate_token!
-        from = URI.parse(@env.HTTP_REFERER).path
-        LOGGER.debug "Validating form token"
-        _init_token_box!
-        @state.token_box.validate!(from, @input.tok)
+       #from = URI.parse(@env.HTTP_REFERER).path
+       #LOGGER.debug "Validating form token"
+       #token_box.validate!(from, @input.tok)
       end
       
       def profile_by_nickname(n)
@@ -140,12 +139,8 @@ module Pasaporte
       end
     end
     
-    def _init_token_box!
-      unless @state.token_box
-        LOGGER.warn "Cookiez " +  @cookies.inspect
-        LOGGER.warn "State " +  @state.inspect
-        @state.token_box = TokenBox.new
-      end
+    def token_box
+      @state.token_box ||= TokenBox.new
     end
     
     def service(*a)
@@ -199,7 +194,7 @@ module Pasaporte
   # The order here is important. Camping::Session has to come LAST (outermost)
   # otherwise you risk losing the session if one of the services upstream
   # redirects.
-  [CampingFlash, CookiePreservingRedirect, Secure, JulikState].map{|m| include m }
+  [CampingFlash, Secure, JulikState, CookiePreservingRedirect].map{|m| include m }
   
   
   module Models
@@ -948,9 +943,8 @@ module Pasaporte
     end
     
     def _csrf_token
-      _init_token_box!
-      input :name => :tok, :type => :hidden, :value => @state.token_box.procure!(@env.REQUEST_URI)
-      LOGGER.warn "After token procurement #{@state.token_box.inspect}"
+     #input :name => :tok, :type => :hidden, :value => token_box.procure!(@env.REQUEST_URI)
+     #LOGGER.warn "After token procurement #{token_box.inspect}"
     end
     
     def openid_server
