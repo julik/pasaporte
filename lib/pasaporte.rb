@@ -588,7 +588,6 @@ module Pasaporte
         <Service priority="1">
           <Type>http://openid.net/signon/2.0</Type>
           <URI>%s</URI>
-          <openid:Delegate>%s</openid:Delegate>
         </Service>
         </XRD>
         </xrds:XRDS>
@@ -596,8 +595,10 @@ module Pasaporte
       
       def get_with_nick
         @headers["Content-Type"] = "application/xrds+xml"
+        LOGGER.warn "YADIS requested for #{@nickname}"
         @skip_layout = true
-        YADIS_TPL % get_endpoints
+        # We only use the server for now
+        YADIS_TPL % get_endpoints[0]
       end
       
       private
@@ -1013,8 +1014,11 @@ module Pasaporte
       xhtml_transitional do
         head do
           self << '<meta http-equiv="X-XRDS-Location" content="%s/yadis" />' % _our_identity_url
-          link :rel => "openid.server", :href => _openid_server_uri 
-          link :rel => "openid.delegate", :href => _openid_delegate_uri
+          link :rel => "openid.server", :href => _openid_server_uri
+          if (@profile && @profile.delegates_openid?)
+            link :rel => "openid.delegate", :href => _openid_delegate_uri
+          end
+          
           link :rel => "stylesheet", :href => _s("pasaporte.css")
           script :type=>'text/javascript', :src => _s("pasaporte.js")
           title(@title || ('%s : pasaporte' % env['SERVER_NAME']))
