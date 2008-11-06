@@ -1308,12 +1308,12 @@ module Pasaporte
   end
 
   def self.create
-  # JulikState.create_schema
-  # self::Models.create_schema
-  # self::LOGGER.warn "Deleting sessions, assocs and nonces"
-  # [self::Models::Throttle, self::Models::Nonce, 
-  #  self::Models::Association, JulikState::State].each do | m |
-  #   m.delete_all
-  # end
+    JulikState.create_schema
+    self::Models.create_schema
+    self::LOGGER.warn "Deleting sessions, assocs and nonces"
+    [self::Models::Throttle, self::Models::Nonce, 
+     self::Models::Association, JulikState::State].each do | m |
+      m.delete_all
+    end
   end
 end
