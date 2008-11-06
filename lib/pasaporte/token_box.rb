@@ -1,12 +1,12 @@
 # A simple but effective CSRF protector
 class TokenBox
   class Invalid < RuntimeError; end
-  MAX_TOKENS, TOKEN_SIZE = 2, 28
+  MAX_TOKENS, TOKEN_SIZE = 4, 28
   CHARS = [*'A'..'Z'] + [*'0'..'9'] + [*'a'..'z']
   WINDOW = 10.minutes # Gone in 60 seconds
   
   class Token
-    attr_reader :token, :will_expire
+    attr_reader :token
     alias_method :to_s, :token
     
     def initialize(lifetime)
