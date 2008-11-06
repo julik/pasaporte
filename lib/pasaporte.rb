@@ -35,7 +35,6 @@ module Pasaporte
   
   LOGGER = Logger.new(STDERR) #:nodoc:
   PATH = File.expand_path(__FILE__) #:nodoc:
-  TOKEN_BOX = TokenBox.new
   
   # Stick your super auth HERE. Should be a proc accepting login, pass and domain
   my_little_auth = lambda do | login, pass, domain |
@@ -172,8 +171,9 @@ module Pasaporte
         LOGGER.info "#{env['REMOTE_ADDR']} - Throttled user tried again"
         redirect R(Pasaporte::Controllers::ThrottledPage)
         return self
-      rescue TokenBox::Invalid
-        LOGGER.warn "Form token has been compromised on #{@env.REQUEST_URI}"
+      rescue TokenBox::Invalid => i
+        LOGGER.warn "Form token has been compromised on #{@env.REQUEST_URI} - #{i}"
+        LOGGER.warn @state.token_box.inspect
         redirect R(Pasaporte::Controllers::FormExpired)
       rescue RedirectToSSL
         LOGGER.info "Forcing redirect to SSL page"
@@ -1308,12 +1308,12 @@ module Pasaporte
   end
 
   def self.create
-    JulikState.create_schema
-    self::Models.create_schema
-    self::LOGGER.warn "Deleting sessions, assocs and nonces"
-    [self::Models::Throttle, self::Models::Nonce, 
-     self::Models::Association, JulikState::State].each do | m |
-      m.delete_all
-    end
+  # JulikState.create_schema
+  # self::Models.create_schema
+  # self::LOGGER.warn "Deleting sessions, assocs and nonces"
+  # [self::Models::Throttle, self::Models::Nonce, 
+  #  self::Models::Association, JulikState::State].each do | m |
+  #   m.delete_all
+  # end
   end
 end
