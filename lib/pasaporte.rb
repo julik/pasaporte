@@ -140,7 +140,7 @@ module Pasaporte
       rescue FullStop
         return self
       rescue PleaseLogin
-        LOGGER.info "#{env['REMOTE_ADDR']} - Redirecting to signon #{@cookies.inspect}"
+        LOGGER.info "#{env['REMOTE_ADDR']} - Redirecting to signon"
         redirect R(Pasaporte::Controllers::Signon, @nickname)
         return self
       rescue Throttled
@@ -440,6 +440,12 @@ module Pasaporte
         post_with_nick(*extras)
       end
       
+      def head(*extras)
+        raise "Nickname is required for this action" unless (@nickname = extras.shift)
+        raise "#{self.class} does not respond to head_with_nick" unless respond_to?(:head_with_nick)
+        post_with_nick(*extras)
+      end
+      
       # So that we can define put_with_nick and Camping sees it as #put being available
       def respond_to?(m, *whatever)
         super(m.to_sym) || super("#{m}_with_nick".to_sym)
@@ -527,7 +533,6 @@ module Pasaporte
           @state.delete(:pending_openid)
           r = openid_server.decode_request(input)
           LOGGER.info "Starting a session #{r.trust_root} -> #{r.identity}"
-          puts r.inspect
           @state.pending_openid = r
         elsif @state.pending_openid
           LOGGER.info "Resuming an OpenID session with #{@state.pending_openid.trust_root}"
@@ -580,13 +585,11 @@ module Pasaporte
     
     # Return the yadis autodiscovery XML for the user
     class Yadis < personal(:yadis)
-      YADIS_TPL = %{
-        <xrds:XRDS xmlns:xrds="xri://$xrds" 
-          xmlns="xri://$xrd*($v*2.0)" 
-          xmlns:openid="http://openid.net/xmlns/1.0">
+      YADIS_TPL = %{<?xml version="1.0" encoding="UTF-8"?>
+        <xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)">
         <XRD>
         <Service priority="1">
-          <Type>http://openid.net/signon/2.0</Type>
+          <Type>http://openid.net/signon/1.0</Type>
           <URI>%s</URI>
         </Service>
         </XRD>
@@ -638,7 +641,7 @@ module Pasaporte
       include Secure::CheckMethods
       
       def get(nick=nil)
-        LOGGER.info "Entered signon with #{@cookies.inspect}"
+        LOGGER.info "Entered signon, HTTPS #{@env.HTTPS}"
         deny_throttled!
         return redirect(DashPage, @state.nickname) if @state.nickname 
         if nick && @state.pending_openid
@@ -856,6 +859,22 @@ module Pasaporte
     # it works like a dummy page. After the user has been succesfully authenticated he can
     # show his personal info on this page (this is his identity URL).
     class ProfilePage < personal
+      
+      def head(nick)
+        @nickname = nick
+        # Redirect the OpenID requesting party to the usual HTTP so that
+        # the OpenID procedure takes place without SSL
+        if PARTIAL_SSL && @env.HTTPS
+          uri = URI.parse(R(ProfilePage, nick))
+          uri.scheme, uri.server = 'http', my_domain
+          uri.port = HTTP_PORT unless HTTP_PORT == 80
+          redirect uri.to_s; return
+        end
+        @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
+        LOGGER.warn "Profile page HEADed for #{nick}, sending YADIS header"
+        return
+      end
+      
       def get(nick)
         @nickname = nick
         # Redirect the OpenID requesting party to the usual HTTP so that
