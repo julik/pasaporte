@@ -18,8 +18,8 @@ Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
 
 
-OpenID::DefaultNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1'], ['HMAC-SHA1', 'no-encryption']])
-OpenID::EncryptedNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1']])
+#OpenID::DefaultNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1'], ['HMAC-SHA1', 'no-encryption']])
+#OpenID::EncryptedNegotiator = OpenID::AssociationNegotiator.new([['HMAC-SHA1', 'DH-SHA1']])
 
 # Start an XML tag.  We override to get "<stupidbrowserfriendly />" fwd slash
 class Builder::XmlMarkup
