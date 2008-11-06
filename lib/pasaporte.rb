@@ -447,7 +447,7 @@ module Pasaporte
       def head(*extras)
         raise "Nickname is required for this action" unless (@nickname = extras.shift)
         raise "#{self.class} does not respond to head_with_nick" unless respond_to?(:head_with_nick)
-        post_with_nick(*extras)
+        head_with_nick(*extras)
       end
       
       # So that we can define put_with_nick and Camping sees it as #put being available
