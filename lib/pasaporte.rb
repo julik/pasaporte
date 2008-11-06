@@ -592,7 +592,7 @@ module Pasaporte
       YADIS_TPL = %{<?xml version="1.0" encoding="UTF-8"?>
         <xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)">
         <XRD>
-        <Service priority="1">
+        <Service>
           <Type>http://openid.net/signon/1.0</Type>
           <URI>%s</URI>
         </Service>
@@ -1039,9 +1039,7 @@ module Pasaporte
         head do
           self << '<meta http-equiv="X-XRDS-Location" content="%s/yadis" />' % _our_identity_url
           link :rel => "openid.server", :href => _openid_server_uri
-          if (@profile && @profile.delegates_openid?)
-            link :rel => "openid.delegate", :href => _openid_delegate_uri
-          end
+          link :rel => "openid.delegate", :href => _openid_delegate_uri
           
           link :rel => "stylesheet", :href => _s("pasaporte.css")
           script :type=>'text/javascript', :src => _s("pasaporte.js")
@@ -1073,12 +1071,12 @@ module Pasaporte
       R(Assets, file)
     end
     
-    # Render either our server URL or the URL of the delegate
+    # Render either our endpoint URL or the URL of the delegate
     def _openid_server_uri
       (@profile && @profile.delegates_openid?) ? @profile.openid_server : _our_endpoint_uri
     end
 
-    # Render either our providing URL or the URL of the delegate    
+    # Render either our identity URL or the URL of the delegate    
     def _openid_delegate_uri
       (@profile && @profile.delegates_openid?) ? @profile.openid_delegate : _our_identity_url
     end
