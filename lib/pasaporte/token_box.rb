@@ -28,7 +28,7 @@ class TokenBox
     returning(Token.new(lifetime || WINDOW)) do | t |
       @heap ||= {}
       @heap[request] ||= []
-      @heap[request].shift if @heap[request].length == MAX_TOKENS
+      @heap[request].shift if @heap[request].length >= MAX_TOKENS
       @heap[request] << t
     end.to_s
   end

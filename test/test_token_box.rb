@@ -34,9 +34,7 @@ class TokenBoxTest < Test::Unit::TestCase
   def test_tokens_should_be_discarded
     box = TokenBox.new
     first = box.procure!("a")
-    TokenBox::MAX_TOKENS.times  do
-      box.procure!("a")
-    end
+    TokenBox::MAX_TOKENS.times { box.procure!("a") }
     assert_raise(TokenBox::Invalid) { box.validate!("a", first)}
   end
   
