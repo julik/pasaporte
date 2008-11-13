@@ -497,9 +497,10 @@ module Pasaporte
       include OpenID::Server
       
       class Err < RuntimeError; end #:nodoc
-      class NeedsApproval < RuntimeError; end  #:nodoc
+      class NeedsApproval < Err; end  #:nodoc
       class Denied < Err; end  #:nodoc
-      class NoOpenidRequest < RuntimeError; end  #:nodoc
+      class NoOpenidRequest < Err; end  #:nodoc
+      class SwitchUser < Secure::PleaseLogin; end #:nodoc
       
       def get_with_nick
         require_plain!
@@ -530,6 +531,13 @@ module Pasaporte
         rescue ProtocolError => e
           LOGGER.error "OpenID: Cannot decode the OpenID request - #{e.message}"
           return "Something went wrong processing your request"
+        rescue SwitchUser => e
+          # Force a session save, remove the current user from the session and throw
+          # to the login page for the user to switch  to
+          @state.nickname = nil
+          force_session_save!
+          LOGGER.warn "OpenID: suspend - need to switch user first"
+          @oid_request.immediate ? ask_user_to_approve : (raise e)
         rescue PleaseLogin => e
           # There is a subtlety here. If the user had NO session before entering
           # this, he will get a new SID upon arriving at the signon page and thus
@@ -582,7 +590,7 @@ module Pasaporte
         end
  
         if (@state.nickname && (nick_from_uri != @state.nickname))
-          raise Denied, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
+          raise SwitchUser, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
         end
       end
   

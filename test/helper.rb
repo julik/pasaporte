@@ -8,6 +8,8 @@ require File.dirname(__FILE__) + '/mosquito'
 require 'flexmock'
 require 'flexmock/test_unit'
 
+Markaby::Builder.set(:indent, nil)
+
 # for assert_select and friends
 require 'action_controller'
 require 'action_controller/assertions'

@@ -50,12 +50,12 @@ class TestOpenid < Pasaporte::WebTest
     assert_select 'link[rel=openid.server]', true do | s |
       s = s.pop
       assert_equal "http://test.host/pasaporte/monsieur-hulot/openid", s.attributes["href"],
-        "Should contain the delegate address for Monsieur Hulot"
+        "Should contain the endpoint address for Monsieur Hulot"
     end
     assert_select 'link[rel=openid.delegate]', true do | s |
       s = s.pop
-      assert_equal "http://test.host/pasaporte/monsieur-hulot/openid", s.attributes["href"],
-        "Should contain the endpoint address for Monsieur Hulot"
+      assert_equal "http://test.host/pasaporte/monsieur-hulot", s.attributes["href"],
+        "Should refer to itself"
     end
   end
   
@@ -82,7 +82,7 @@ class TestOpenid < Pasaporte::WebTest
     assert_match(/#{Regexp.escape(@return_to + '?openid1_claimed_id=')}(.+)#{Regexp.escape('&rp_nonce=')}(.+)/, 
       response_params["openid.return_to"],
       "The return_to should be the one of the signup with a nonce")
-    assert_equal "http://test.host/pasaporte/monsieur-hulot/openid",
+    assert_equal "http://test.host/pasaporte/monsieur-hulot",
       response_params["openid.identity"], "The identity is the server URL in this case"
     assert_equal "checkid_setup", response_params['openid.mode'], 
       "The current mode is checkid_setup"
@@ -315,10 +315,24 @@ class TestOpenid < Pasaporte::WebTest
     assert_equal "Monsieur Hulot", sreg_response['fullname']
   end
   
+  def test_in_which_julik_wants_to_login_but_monsieur_hulot_is_logged_in_already
+    prelogin! "monsieur-hulot"
+    
+    req = @consumer.begin("http://test.host/pasaporte/julik")
+    assert_kind_of OpenID::Consumer::CheckIDRequest, req
+    assert_nothing_raised { get_with_verbatim_url req.redirect_url(@trust_root, @return_to) }
+    assert_response :redirect
+    assert_redirected_to '/julik/signon'
+    assert_not_nil @state.pending_openid, "A pending OpenID request should have been "+
+      "placed in the session"
+    assert_nil @state.nickname, "The nickname should have been removed from the session"
+    assert_kind_of OpenID::Server::CheckIDRequest, @state.pending_openid
+  end
+  
   private
     # Prelogins Monsieur Hulot into Pasaporte
-    def prelogin!
-      post '/monsieur-hulot/signon', :pass => 'monsieur-hulot'.reverse
+    def prelogin!(name = 'monsieur-hulot')
+      post('/%s/signon' % name, :pass => name.reverse)
     end
 
     # Preapproves tativille.fr as a site Monsieur Hulot trusts
