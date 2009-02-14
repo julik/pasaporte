@@ -1,6 +1,6 @@
 require File.dirname(__FILE__) + '/helper'
 
-class TokenBoxTest < Test::Unit::TestCase
+class TestTokenBox < Test::Unit::TestCase
   def test_init
     assert_nothing_raised { TokenBox.new }
   end
