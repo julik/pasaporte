@@ -95,12 +95,13 @@ class TestProfile < Camping::ModelTest
     deny p.delegates_openid?, "Delegation is now turned off because we sent a bool switch of false"
   end
   
+  # This is how the new OpenID lib normalizes URIs, has to do with the variance in "what" can be an OpenID URL
   def test_normalizes_both_delegate_urls
     p = create('julik', DOMAIN, 
       :openid_server => 'xxx.com', :openid_delegate => 'xyz.org/x')
-    assert_equal 'http://xxx.com/', p.openid_server, 
+    assert_equal 'xxx.com', p.openid_server, 
       "The URL should be normalized with HTTP scheme and trailing slash"
-    assert_equal 'http://xyz.org/x', p.openid_delegate, 
+    assert_equal 'xyz.org/x', p.openid_delegate, 
       "The URL should be normalized with HTTP scheme"
   end
   
