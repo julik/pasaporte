@@ -6,8 +6,7 @@ class TestSettings < Camping::Test
   def test_application
     emit :throttle_for => 45.minutes
     assert_nothing_raised { Pasaporte.apply_config! }
-    assert_equal 45.minutes, Pasaporte::THROTTLE_FOR, "The setting should have " + 
-      "been applied"
+    assert_equal 45.minutes, Pasaporte::THROTTLE_FOR, "The setting should have been applied"
   end
   
   def test_bail_on_unknowns
