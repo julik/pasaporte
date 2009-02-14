@@ -1,15 +1,8 @@
-$:.reject! { |e| e.include? 'TextMate' }
 require File.dirname(__FILE__) + '/helper'
 require 'fileutils'
 require File.dirname(__FILE__) + '/testable_openid_fetcher'
 require 'openid/store/memory'
 require 'openid/extensions/sreg'
-
-class Object
-  def own_methods
-    raise (methods - Object.instance_methods).inspect
-  end
-end
 
 class TestOpenid < Pasaporte::WebTest
   # We have to open up because it's the Fecther that's going
