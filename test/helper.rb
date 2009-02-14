@@ -14,6 +14,7 @@ Markaby::Builder.set(:indent, nil)
 require 'action_controller'
 require 'action_controller/assertions'
 
+
 class Pasaporte::Controllers::ServerError
   def get(*all)
     raise all.pop
@@ -66,3 +67,6 @@ class Pasaporte::WebTest < Camping::WebTest
     end
   end
 end
+
+# Requires Pasaporte:WebTest to be defined already
+require File.dirname(__FILE__) + '/testable_openid_fetcher'

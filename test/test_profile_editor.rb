@@ -1,7 +1,4 @@
 require File.dirname(__FILE__) + '/helper'
-require File.dirname(__FILE__) + '/testable_openid_fetcher'
-
-require 'flexmock'
 
 class TestProfileEditor < Pasaporte::WebTest
   test 'should require login' do
