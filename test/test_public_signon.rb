@@ -12,8 +12,7 @@ class TestPublicSignon < Pasaporte::WebTest
     post '/', :login => 'schtwo', :pass => 'foo'
     assert_response :success
     assert_nil @state.nickname
-    assert_select 'input[type="hidden"]', true
-      "The response should include a hidden field now instead of a text field"
+    assert_select 'input[value="schtwo"]', true
   end
   
   test 'should redirect to profile page for new users' do
