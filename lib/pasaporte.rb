@@ -939,7 +939,8 @@ module Pasaporte
     
     # Return a RELATIVELY reliable domain key
     def my_domain
-      env["SERVER_NAME"].gsub(/^www\./i, '').chars.downcase.to_s
+      server = env["SERVER_NAME"].gsub(/^www\./i, '')
+      (server.mb_chars rescue server.chars).downcase.to_s
     end
   
     # Camping processes double values (hidden field with 0 and checkbox with 1) as an array.
