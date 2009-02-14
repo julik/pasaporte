@@ -1,7 +1,4 @@
 require File.dirname(__FILE__) + '/helper'
-require File.dirname(__FILE__) + '/testable_openid_fetcher'
-
-require 'flexmock'
 
 class TestProfilePage < Pasaporte::WebTest
   fixtures :pasaporte_profiles
@@ -123,28 +120,6 @@ class TestSignon < Pasaporte::WebTest
     assert_not_nil @assigns.profile, "The profile should have been hooked up"
     assert_equal 'gemanges', @assigns.profile.nickname
     deny @assigns.profile.new_record?
-  end
-end
-
-class TestSignout < Pasaporte::WebTest
-  def test_signout_should_silently_redirect_unless_signed_in
-    get '/somebody/signout'
-    assert_response :redirect
-    assert_redirected_to '/somebody/signon'
-  end
-  
-  def test_signout_should_erase_session_and_redirect
-    flexmock(Pasaporte::AUTH).
-        should_receive(:call).with("gemanges", "tairn", "test.host").once.and_return(true)
-    post '/gemanges/signon', :pass => 'tairn'
-    assert_response :redirect
-    assert_equal 'gemanges', @state.nickname
-    
-    get '/gemanges/signout'
-    assert_response :redirect
-    assert_redirected_to '/gemanges/signon'
-    assert_kind_of Camping::H, @state, "State should be reset with Camping::H"
-    assert_equal %w( msg ), @state.keys, "State should only contain the message"
   end
 end
 
