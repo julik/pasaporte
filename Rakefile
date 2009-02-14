@@ -4,18 +4,11 @@ require 'hoe'
 require File.dirname(__FILE__) + '/lib/pasaporte'
 $KCODE = 'u'
 
-class KolkHoe < Hoe
-  def define_tasks
-    extra_deps.reject! {|e| e[0] == 'hoe' }
-    super
-  end
-end
-
 # Disable spurious warnings when running tests, ActiveMagic cannot stand -w
 Hoe::RUBY_FLAGS.replace ENV['RUBY_FLAGS'] || "-I#{%w(lib test).join(File::PATH_SEPARATOR)}" + 
   (Hoe::RUBY_DEBUG ? " #{RUBY_DEBUG}" : '')
 
-KolkHoe.new('Pasaporte', Pasaporte::VERSION) do |p|
+psp = Hoe.new('Pasaporte', Pasaporte::VERSION) do |p|
   p.name = "pasaporte"
   p.author = "Julik Tarkhanov"
   p.description = "An OpenID server with a colored bar on top"
@@ -25,8 +18,10 @@ KolkHoe.new('Pasaporte', Pasaporte::VERSION) do |p|
   p.rdoc_pattern = /README.txt|CHANGELOG.txt|lib/
   p.test_globs = 'test/test_*.rb'
   p.need_zip = true
-  p.extra_deps = ['activerecord', 'camping', ['ruby-openid', '>=2.1.0'], 'flexmock']
+  p.extra_deps = ['activerecord', ['camping' '>=1.5.180'], ['ruby-openid', '>=2.1.0'], 'flexmock']
 end
+
+psp.spec.rdoc_options << "--charset" << "utf-8"
 
 desc "Generate the proper list of country codes from the ISO list"
 task :build_country_list do

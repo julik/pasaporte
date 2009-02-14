@@ -1,2 +1,2 @@
-=== HEAD
-* Initial rollout
+=== 0.0.3 - 14.02.2009
+* Most glaring bugs fixed

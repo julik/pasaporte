@@ -24,6 +24,8 @@ Markaby::Builder.set(:indent, 2)
 Markaby::Builder.set(:output_xml_instruction, false)
 
 module Pasaporte
+  VERSION = '0.0.3'
+  
   module Auth; end # Acts as a container for auth classes
   
   MAX_FAILED_LOGIN_ATTEMPTS = 3
@@ -31,7 +33,8 @@ module Pasaporte
   DEFAULT_COUNTRY = 'nl'
   DEFAULT_TZ = 'Europe/Amsterdam'
   ALLOW_DELEGATION = true
-  VERSION = '0.0.1'
+  
+  
   SESSION_LIFETIME = 12.hours
   PARTIAL_SSL = false
   HTTP_PORT = 80
