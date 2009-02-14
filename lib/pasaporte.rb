@@ -262,6 +262,9 @@ module Pasaporte
           
           LOGGER.info "OpenID: nick must match the identity URL"
           check_nickname_matches_identity_url
+
+          LOGGER.info "OpenID: identity must reside on our server"
+          check_identity_lives_here
           
           LOGGER.info "OpenID: user must be logged in"
           check_logged_in
@@ -343,7 +346,16 @@ module Pasaporte
           raise SwitchUser, "The identity '#{@oid_request.claimed_id}' is not the one of the current user"
         end
       end
-  
+      
+      # TODO: we need to give the user a chance to say "I want these URLs to be legit too"
+      def check_identity_lives_here
+        the_id = URI.parse(@oid_request.identity)
+        # HTTP_HOST check
+        if (the_id.host != @env['HTTP_HOST'])
+          raise Denied, "The identity '#{@oid_request.claimed_id}' is not in this server(#{@env['HTTP_HOST']}"
+        end
+      end
+      
       def check_logged_in
         message = "Before authorizing '%s' you will need to login" % input["openid.trust_root"]
         require_login!(:pending_openid => @oid_request, :msg => message)
@@ -389,7 +401,7 @@ module Pasaporte
       
       def get_with_nick
         @headers["Content-Type"] = "application/xrds+xml"
-        LOGGER.warn "YADIS requested for #{@nickname}"
+        LOGGER.info "YADIS requested for #{@nickname}"
         @skip_layout = true
         # We only use the server for now
         YADIS_TPL % get_endpoints[0]
@@ -432,7 +444,7 @@ module Pasaporte
       include Secure::CheckMethods
       
       def get(nick=nil)
-        LOGGER.info "Entered signon, HTTPS #{@env.HTTPS}"
+        LOGGER.info "Entered signon, #{@env.HTTPS ? :HTTPS : :HTTP_plain }"
         deny_throttled!
         return redirect(DashPage, @state.nickname) if @state.nickname 
         if nick && @state.pending_openid
@@ -663,11 +675,12 @@ module Pasaporte
       
       def get(nick)
         @nickname = nick
-        # Redirect the OpenID requesting party to the usual HTTP so that
-        # the OpenID procedure takes place without SSL
-        require_plain!
         
-        LOGGER.warn "Profile page GET for #{nick}, sending YADIS header"
+        # Redirect the OpenID requesting party to the usual HTTP so that
+        # the OpenID procedure takes place without SSL, if partial SSL is turned on
+        require_plain! if PARTIAL_SSL
+        
+        LOGGER.info "Profile page GET for #{nick}, sending YADIS header"
         @headers['X-XRDS-Location'] = _our_identity_url + '/yadis'
         @title = "#{@nickname}'s profile" 
         @profile = Profile.find_by_nickname_and_domain_name(@nickname, my_domain)

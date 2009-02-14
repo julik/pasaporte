@@ -15,7 +15,18 @@ that, when called, will return true or false. Yes, it's that simple. All the neg
 smorgasbord, profile editing, encryptodecryption and other electrabombastic niceties are
 going to be taken care of.
 
-Should the password become stale or should the authentication backend say that it no
+Here is an example of a simple auth procedure:
+
+  # Stick your super auth HERE. Should be a proc accepting login, pass and domain
+  Pasaporte::AUTH = lambda do | login, pass, domain |
+    allowd = {"joe" => "secret"}
+    return (allowd[login] && (allowd[login] == pass))
+  end
+
+Obviously you can let your auth procedure look up in ACLs and things like that if you
+really need it to.
+
+If the password becomes stale or should the authentication backend say that it no
 longer has the user in question the authorization tokens are immediately revoked, and any
 authorization requests will be denied.
 
@@ -28,7 +39,8 @@ only the signon page (where the password is entered) and subsequent pages with w
 interacts will be protected with SSL encryption, while the public OpenID endpoint will NOT be
 SSL-enabled. Same is true for the server-server step of OpenID handshake.
 
-This will allow even stricter providers to use Pasaporte servers.
+This will allow even stricter providers to use Pasaporte servers, but without passing the user login
+over the wire in clear text.
 
 When partial SSL is turned on, the profile page (OpenID identity) will forcibly be made
 unencrypted (will redirect to non-secure port).
@@ -38,6 +50,8 @@ Partial SSL is disabled by default - to enable set PARTIAL_SSL to true.
 == Current issues
 
 As of now, we are not aware of sites that cannot consume OpenID from Pasaporte.
+There is currently no provision for verifying that the URL you are logging in from is the
+one Pasaporte manages.
 
 == Configuration
 
