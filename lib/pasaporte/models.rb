@@ -246,7 +246,7 @@ module Pasaporte::Models
   
     private
     def self.prune!;  delete_all "created_at < '#{cutoff.to_s(:db)}'"; end
-    def self.cutoff; Time.now - THROTTLE_FOR; end
+    def self.cutoff; Time.now - Pasaporte::THROTTLE_FOR; end
     def self.env_hash(e)
       OpenSSL::Digest::SHA1.new([e['REMOTE_ADDR'], e['HTTP_USER_AGENT']].map(&:to_s).join('|')).to_s
     end
